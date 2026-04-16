@@ -8,6 +8,14 @@
     "latestNAV": 15.8016
   },
   {
+    "name": "กองทุนเปิดอีสท์สปริง Global Quality Growth (ES-GQG)",
+    "file": "Global-Quality-Growth-ES-GQG.json",
+    "firstDate": "2022-01-04",
+    "lastDate": "2025-12-30",
+    "count": 907,
+    "latestNAV": 23.9369
+  },
+  {
     "name": "กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)",
     "file": "Income-Plus-ES-IPLUS.json",
     "firstDate": "2022-01-04",
