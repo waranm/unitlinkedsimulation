@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unit Linked Simulation — Monte Carlo</title>
+  <!-- SheetJS for XLS/XLSX reading -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════ HEADER ═══════════════════════════════════════ -->
+<header>
+  <div>
+    <div class="logo">Unit Linked Simulation</div>
+    <div class="subtitle">Monte Carlo — Insurance Financial Planning Tool</div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ STEPPER ══════════════════════════════════════ -->
+<div class="stepper">
+  <div class="step active" id="s0">
+    <div class="step-num">1</div>
+    <span>อัปโหลดข้อมูล</span>
+  </div>
+  <div class="step-connector" id="c0"></div>
+  <div class="step" id="s1">
+    <div class="step-num">2</div>
+    <span>ตั้งค่า Simulation</span>
+  </div>
+  <div class="step-connector" id="c1"></div>
+  <div class="step" id="s2">
+    <div class="step-num">3</div>
+    <span>รัน Simulation</span>
+  </div>
+  <div class="step-connector" id="c2"></div>
+  <div class="step" id="s3">
+    <div class="step-num">4</div>
+    <span>ผลลัพธ์</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ MAIN ════════════════════════════════════════ -->
+<main>
+
+  <!-- ── STEP 1: Upload ──────────────────────────────────────────────────── -->
+  <div class="section active" id="step-upload">
+
+    <!-- Saved Funds -->
+    <div class="card">
+      <div class="card-title" style="justify-content:space-between">
+        <span><span class="icon">💾</span> กองทุนที่บันทึกไว้</span>
+        <button class="btn btn-sm" id="btnClearAll"
+          style="background:#fff;color:var(--danger);border:1.5px solid var(--danger);display:none">
+          🗑 ล้างทั้งหมด
+        </button>
+      </div>
+      <div id="savedFundsList"></div>
+    </div>
+
+    <!-- Fund Library -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📚</span> คลังกองทุน (Fund Library)</div>
+      <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
+        กองทุนที่เตรียมข้อมูลไว้ให้แล้ว — คลิกเพื่อโหลดได้เลย
+      </p>
+      <div id="fundLibrary">
+        <div style="color:var(--gray-400);font-size:13px">กำลังโหลดรายการ...</div>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📂</span> หรืออัปโหลดไฟล์เอง</div>
+
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📊</div>
+        <p><strong>คลิกเพื่อเลือกไฟล์</strong> หรือลากไฟล์มาวางที่นี่</p>
+        <p style="margin-top:6px">รองรับ <strong>.xls</strong>, <strong>.xlsx</strong> และ <strong>.csv</strong></p>
+      </div>
+      <input type="file" id="fileInput" accept=".xls,.xlsx,.csv" />
+
+      <div class="info-box" style="margin-top:14px">
+        <strong>รูปแบบ XLS/XLSX (แนะนำ):</strong> ไม่มี header row
+        <br/>คอลัมน์ A = ชื่อกองทุน &nbsp;|&nbsp; B = วันที่ (DD/MM/YYYY) &nbsp;|&nbsp; C = NAV &nbsp;|&nbsp; D = Offer &nbsp;|&nbsp; E = BID
+        <br/>รองรับหลายกองทุนเรียงต่อกันในไฟล์เดียว
+        <code style="display:block;margin-top:6px;background:#dce8f8;padding:6px 10px;border-radius:4px;font-size:12px">
+          กองทุน ABC &nbsp;|&nbsp; 30/12/2022 &nbsp;|&nbsp; 11.6162 &nbsp;|&nbsp; 11.6163 &nbsp;|&nbsp; 11.6162<br/>
+          กองทุน ABC &nbsp;|&nbsp; 29/12/2022 &nbsp;|&nbsp; 11.6153 &nbsp;|&nbsp; 11.6154 &nbsp;|&nbsp; 11.6153
+        </code>
+        <div style="margin-top:10px"><strong>ราคาที่ใช้ในการคำนวณ:</strong>
+          ซื้อหน่วย = <strong>Offer</strong> &nbsp;|&nbsp; มูลค่าพอร์ต = <strong>BID</strong>
+        </div>
+      </div>
+
+      <div id="uploadStatus"></div>
+      <div id="dataPreview" class="data-preview" style="display:none"></div>
+
+      <div class="action-row">
+        <button class="btn btn-primary" id="btnNext1" disabled>
+          ถัดไป: ตั้งค่า →
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── STEP 2: Parameters ──────────────────────────────────────────────── -->
+  <div class="section" id="step-params">
+
+    <!-- Premium & Payment -->
+    <div class="card">
+      <div class="card-title"><span class="icon">💰</span> เบี้ยประกันและรูปแบบการชำระ</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="inputPremium">เบี้ยประกัน (บาท / งวด)</label>
+          <input type="number" id="inputPremium" min="1000" max="100000" step="100" value="5000" />
+          <span class="form-hint">ช่วง 1,000 – 100,000 บาท</span>
+        </div>
+        <div class="form-group">
+          <label for="selectPayment">รูปแบบการชำระเบี้ย</label>
+          <select id="selectPayment">
+            <option value="monthly">รายเดือน (Monthly)</option>
+            <option value="quarterly">รายไตรมาส (Quarterly)</option>
+            <option value="semi-annual">ราย 6 เดือน (Semi-annually)</option>
+            <option value="annual">รายปี (Annually)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation Period -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📅</span> ระยะเวลา Simulation</div>
+      <div class="period-options" id="periodOptions"></div>
+      <div class="info-box" id="jointInfo" style="display:none"></div>
+    </div>
+
+    <!-- Asset Allocation -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🥧</span> การจัดสรรสินทรัพย์ (Asset Allocation)</div>
+      <table class="alloc-table" id="allocTable">
+        <thead>
+          <tr>
+            <th>กองทุน</th>
+            <th>สัดส่วน (%)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="alloc-total" id="allocTotal">รวม: 0%</div>
+    </div>
+
+    <!-- Rebalancing -->
+    <div class="card">
+      <div class="card-title"><span class="icon">⚖️</span> กลยุทธ์การปรับสมดุล (Rebalancing)</div>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="rebalance" value="none" checked />
+          ไม่มีการปรับสมดุล (No Rebalancing)
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="rebalance" value="monthly" />
+          ปรับสมดุลรายเดือน (Monthly)
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="rebalance" value="quarterly" />
+          ปรับสมดุลรายไตรมาส (Quarterly)
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="rebalance" value="annual" />
+          ปรับสมดุลรายปี (Annual)
+        </label>
+      </div>
+    </div>
+
+    <!-- Monte Carlo N -->
+    <div class="card">
+      <div class="card-title"><span class="icon">🎲</span> จำนวนรอบ Monte Carlo</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="inputN">จำนวนสถานการณ์ (N)</label>
+          <input type="number" id="inputN" min="100" max="10000" step="100" value="1000" />
+          <span class="form-hint">100 – 10,000 (ค่าเริ่มต้น: 1,000)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-secondary" id="btnBack2">← ย้อนกลับ</button>
+      <button class="btn btn-primary" id="btnNext2">ถัดไป: รัน Simulation →</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Run ─────────────────────────────────────────────────────── -->
+  <div class="section" id="step-run">
+    <div class="card">
+      <div class="card-title"><span class="icon">🚀</span> พร้อมรัน Monte Carlo Simulation</div>
+
+      <div id="simSummary" style="font-size:14px;color:var(--gray-700);margin-bottom:20px">
+        <!-- populated by JS -->
+      </div>
+
+      <div id="runProgress" style="display:none">
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progressBar" style="width:0%"></div>
+        </div>
+        <div id="progressText" style="text-align:center;font-size:13px;color:var(--gray-500);margin-top:4px">0%</div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-secondary" id="btnBack3">← ย้อนกลับ</button>
+        <button class="btn btn-primary" id="btnRun">▶ เริ่มการ Simulation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: Results ─────────────────────────────────────────────────── -->
+  <div class="section" id="step-results">
+
+    <!-- Chart controls -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📈</span> ผลการ Simulation — แสดงเปอร์เซ็นไทล์</div>
+
+      <div class="pct-options">
+        <label class="pct-label">
+          <input type="checkbox" class="pct-check" value="98" checked />
+          <span class="pct-swatch" style="background:#16a34a"></span> P98 (Optimistic)
+        </label>
+        <label class="pct-label">
+          <input type="checkbox" class="pct-check" value="75" checked />
+          <span class="pct-swatch" style="background:#1a56a0"></span> P75 (Above Avg)
+        </label>
+        <label class="pct-label">
+          <input type="checkbox" class="pct-check" value="50" checked />
+          <span class="pct-swatch" style="background:#e8a020"></span> P50 (Median)
+        </label>
+        <label class="pct-label">
+          <input type="checkbox" class="pct-check" value="25" checked />
+          <span class="pct-swatch" style="background:#dc2626"></span> P25 (Conservative)
+        </label>
+      </div>
+
+      <div id="chartContainer">
+        <canvas id="simulationChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span> สรุปผลลัพธ์ ณ สิ้นสุดระยะเวลา Simulation</div>
+      <table class="summary-table" id="summaryTable">
+        <thead>
+          <tr>
+            <th>เปอร์เซ็นไทล์</th>
+            <th>เบี้ยรวมที่ชำระ (THB)</th>
+            <th>มูลค่าพอร์ตสุดท้าย (THB)</th>
+            <th>กำไร / ขาดทุน (THB)</th>
+            <th>ผลตอบแทน (%)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Export & Actions -->
+    <div class="card">
+      <div class="card-title"><span class="icon">💾</span> Export ผลลัพธ์</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-secondary" id="btnExportCSV">⬇ Export CSV</button>
+        <button class="btn btn-secondary" id="btnExportPNG">🖼 Export Chart PNG</button>
+        <button class="btn btn-accent" id="btnRerun">🔄 ปรับค่าใหม่</button>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<!-- App modules -->
+<script src="js/simulation.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
