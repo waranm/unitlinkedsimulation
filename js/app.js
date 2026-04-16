@@ -602,13 +602,24 @@ function buildSummaryTable() {
   let payments = 0;
   for (let m = 0; m < months; m += step) payments++;
   const totalPremium = state.premium * payments;
+  const years = months / 12;
 
   for (const p of [98, 75, 50, 25]) {
     if (!state.selectedPcts.includes(p)) continue;
     const final  = percentiles[p][months - 1] || 0;
     const ret    = final - totalPremium;
     const retPct = totalPremium > 0 ? (ret / totalPremium * 100) : 0;
-    const cls    = ret >= 0 ? 'positive' : 'negative';
+
+    // CAGR = (final / totalPremium)^(1/years) - 1
+    // Only meaningful when final > 0 and years > 0
+    let cagrStr = '-';
+    if (final > 0 && totalPremium > 0 && years > 0) {
+      const cagr = (Math.pow(final / totalPremium, 1 / years) - 1) * 100;
+      cagrStr = (cagr >= 0 ? '+' : '') + cagr.toFixed(2) + '%';
+    }
+
+    const cls     = ret >= 0 ? 'positive' : 'negative';
+    const cagrCls = (final >= totalPremium) ? 'positive' : 'negative';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>เปอร์เซ็นไทล์ที่ ${p}</td>
@@ -616,6 +627,7 @@ function buildSummaryTable() {
       <td>${fmtTHB(final)}</td>
       <td class="${cls}">${ret >= 0 ? '+' : ''}${fmtTHB(ret)}</td>
       <td class="${cls}">${ret >= 0 ? '+' : ''}${retPct.toFixed(1)}%</td>
+      <td class="${cagrCls}">${cagrStr}</td>
     `;
     tbody.appendChild(tr);
   }
