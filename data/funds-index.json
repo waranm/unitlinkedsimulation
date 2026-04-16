@@ -1,5 +1,13 @@
 [
   {
+    "name": "กองทุนเปิดอีสท์สปริง Asia Active Equity (ชนิดสะสมมูลค่า) (ES-ASIA-A)",
+    "file": "Asia-Active-Equity-ES-ASIA-A.json",
+    "firstDate": "2022-01-04",
+    "lastDate": "2025-12-30",
+    "count": 891,
+    "latestNAV": 15.8016
+  },
+  {
     "name": "กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)",
     "file": "Income-Plus-ES-IPLUS.json",
     "firstDate": "2022-01-04",
