@@ -18,6 +18,18 @@
     <div class="logo">Unit Linked Simulation</div>
     <div class="subtitle">Monte Carlo — Insurance Financial Planning Tool</div>
   </div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="readme.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      Methodology
+    </a>
+    <a href="changelog.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      Changelog
+    </a>
+  </div>
 </header>
 
 <!-- ═══════════════════════════ STEPPER ══════════════════════════════════════ -->
@@ -134,7 +146,7 @@
 
     <!-- Simulation Period -->
     <div class="card">
-      <div class="card-title"><span class="icon">📅</span> ระยะเวลา Simulation</div>
+      <div class="card-title"><span class="icon">📅</span> ระยะเวลาลงทุน</div>
       <div class="period-options" id="periodOptions"></div>
       <div class="info-box" id="jointInfo" style="display:none"></div>
     </div>
@@ -160,20 +172,33 @@
       <div class="radio-group">
         <label class="radio-option">
           <input type="radio" name="rebalance" value="none" checked />
-          ไม่มีการปรับสมดุล (No Rebalancing)
+          ไม่มีการปรับสมดุล
         </label>
         <label class="radio-option">
           <input type="radio" name="rebalance" value="monthly" />
-          ปรับสมดุลรายเดือน (Monthly)
+          รายเดือน
         </label>
         <label class="radio-option">
           <input type="radio" name="rebalance" value="quarterly" />
-          ปรับสมดุลรายไตรมาส (Quarterly)
+          รายไตรมาส
         </label>
         <label class="radio-option">
           <input type="radio" name="rebalance" value="annual" />
-          ปรับสมดุลรายปี (Annual)
+          รายปี
         </label>
+      </div>
+
+      <!-- Compare toggle -->
+      <div class="compare-toggle-row">
+        <label class="toggle-wrap">
+          <input type="checkbox" id="cbCompareRebalance" />
+          <span class="toggle-knob"></span>
+          <span class="toggle-text">เปรียบเทียบทุกความถี่พร้อมกัน</span>
+        </label>
+        <p class="compare-toggle-hint" id="compareToggleHint" style="display:none">
+          จะรันการจำลอง 4 รอบ (ไม่ปรับสมดุล / รายเดือน / รายไตรมาส / รายปี) แล้วแสดงผลลัพธ์ทั่วไปของแต่ละแบบบนกราฟเดียวกัน
+          — ใช้เวลาคำนวณนานกว่าปกติประมาณ 4 เท่า
+        </p>
       </div>
     </div>
 
@@ -221,26 +246,35 @@
   <!-- ── STEP 4: Results ─────────────────────────────────────────────────── -->
   <div class="section" id="step-results">
 
-    <!-- Chart controls -->
+    <!-- Outcome Summary Panel — injected by renderOutcomeSummary() -->
+    <div id="resultSummaryPanel"></div>
+
+    <!-- Chart -->
     <div class="card">
-      <div class="card-title"><span class="icon">📈</span> ผลการ Simulation — แสดงเปอร์เซ็นไทล์</div>
+      <div class="card-title"><span class="icon">📈</span> ผลการ Simulation — เส้นผลลัพธ์</div>
 
       <div class="pct-options">
         <label class="pct-label">
           <input type="checkbox" class="pct-check" value="98" checked />
-          <span class="pct-swatch" style="background:#16a34a"></span> P98 (Optimistic)
+          <span class="pct-swatch" style="background:#16a34a"></span> Optimistic (98%)
         </label>
         <label class="pct-label">
           <input type="checkbox" class="pct-check" value="75" checked />
-          <span class="pct-swatch" style="background:#1a56a0"></span> P75 (Above Avg)
+          <span class="pct-swatch" style="background:#1a56a0"></span> Upside (75%)
         </label>
         <label class="pct-label">
           <input type="checkbox" class="pct-check" value="50" checked />
-          <span class="pct-swatch" style="background:#e8a020"></span> P50 (Median)
+          <span class="pct-swatch" style="background:#e8a020"></span> Typical — Median (50%)
         </label>
         <label class="pct-label">
           <input type="checkbox" class="pct-check" value="25" checked />
-          <span class="pct-swatch" style="background:#dc2626"></span> P25 (Conservative)
+          <span class="pct-swatch" style="background:#dc2626"></span> Downside (25%)
+        </label>
+        <label class="pct-label">
+          <input type="checkbox" id="cbMean" checked />
+          <span style="display:inline-block;width:22px;height:0;border-top:2.5px dashed #7c3aed;
+                       vertical-align:middle;margin-bottom:2px"></span>
+          Average (Mean)
         </label>
       </div>
 
@@ -249,18 +283,24 @@
       </div>
     </div>
 
+    <!-- Rebalance compare insight — visible only in compare mode -->
+    <div id="rebalCompareInsight" style="display:none"></div>
+
+    <!-- Risk Framing — injected by renderRiskFraming() -->
+    <div id="resultRiskFraming"></div>
+
     <!-- Summary table -->
     <div class="card">
-      <div class="card-title"><span class="icon">📋</span> สรุปผลลัพธ์ ณ สิ้นสุดระยะเวลา Simulation</div>
+      <div class="card-title"><span class="icon">📋</span> ตารางสรุปผลลัพธ์</div>
       <table class="summary-table" id="summaryTable">
         <thead>
           <tr>
-            <th>เปอร์เซ็นไทล์</th>
+            <th>ผลลัพธ์</th>
             <th>เบี้ยรวมที่ชำระ (THB)</th>
             <th>มูลค่าพอร์ตสุดท้าย (THB)</th>
             <th>กำไร / ขาดทุน (THB)</th>
             <th>Total Return (%)</th>
-            <th>CAGR (% ต่อปี)</th>
+            <th>IRR (% ต่อปี)</th>
           </tr>
         </thead>
         <tbody></tbody>

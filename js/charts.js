@@ -12,10 +12,10 @@ const PERCENTILE_COLORS = {
 };
 
 const PERCENTILE_LABELS = {
-  98: 'เปอร์เซ็นไทล์ที่ 98 (Optimistic)',
-  75: 'เปอร์เซ็นไทล์ที่ 75 (Above Average)',
-  50: 'เปอร์เซ็นไทล์ที่ 50 (Median)',
-  25: 'เปอร์เซ็นไทล์ที่ 25 (Conservative)',
+  98: 'Optimistic (98%)',
+  75: 'Upside (75%)',
+  50: 'Typical — Median (50%)',
+  25: 'Downside (25%)',
 };
 
 let chartInstance = null;
@@ -27,8 +27,10 @@ let chartInstance = null;
  * @param {number}  months       total months
  * @param {number[]} selected    which percentiles to show
  * @param {Date}    startDate    simulation start date (for x-axis labels)
+ * @param {Object}  [opts]       optional extras
+ * @param {number[]|null} [opts.meanSeries]  mean portfolio value at each month (dashed overlay)
  */
-function renderChart(ctx, percentiles, months, selected, startDate) {
+function renderChart(ctx, percentiles, months, selected, startDate, opts = {}) {
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
 
   const labels = [];
@@ -40,7 +42,24 @@ function renderChart(ctx, percentiles, months, selected, startDate) {
   }
 
   const datasets = [];
-  // Render from highest to lowest so fills stack nicely
+
+  // Mean overlay — dashed purple line drawn first so it sits behind percentile bands
+  if (opts.meanSeries) {
+    datasets.push({
+      label: 'Average (Mean)',
+      data: opts.meanSeries,
+      borderColor: '#7c3aed',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [7, 4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3,
+      order: 0,
+    });
+  }
+
+  // Percentile bands — render from highest to lowest so fills stack nicely
   for (const p of [98, 75, 50, 25]) {
     if (!selected.includes(p)) continue;
     const col = PERCENTILE_COLORS[p];
@@ -53,6 +72,7 @@ function renderChart(ctx, percentiles, months, selected, startDate) {
       pointRadius: 0,
       fill: false,
       tension: 0.3,
+      order: 1,
     });
   }
 
@@ -107,6 +127,88 @@ function formatTHBCompact(v) {
   if (Math.abs(v) >= 1_000_000) return '฿' + (v / 1_000_000).toFixed(1) + 'M';
   if (Math.abs(v) >= 1_000)     return '฿' + (v / 1_000).toFixed(0) + 'K';
   return '฿' + v.toFixed(0);
+}
+
+/**
+ * Render a P50-only comparison chart for rebalance-frequency analysis.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} compareResults  { monthly, quarterly, annual } — each is a runMonteCarlo result
+ * @param {string|null} primaryMode  which key gets the solid/thick treatment (null = none highlighted)
+ * @param {Date}  startDate
+ */
+function renderCompareRebalanceChart(ctx, compareResults, primaryMode, startDate) {
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const CONFIGS = {
+    none:      { label: 'ไม่ปรับสมดุล', color: '#9ca3af' },
+    monthly:   { label: 'รายเดือน',     color: '#1a56a0' },
+    quarterly: { label: 'รายไตรมาส',    color: '#e8a020' },
+    annual:    { label: 'รายปี',        color: '#16a34a' },
+  };
+
+  // Derive month count from first available result
+  const months = (compareResults.none || compareResults.monthly || compareResults.quarterly || compareResults.annual).months;
+
+  const labels = [];
+  const base = startDate ? new Date(startDate) : new Date();
+  for (let m = 0; m < months; m++) {
+    const d = new Date(base);
+    d.setMonth(d.getMonth() + m + 1);
+    labels.push(`${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  const datasets = Object.entries(CONFIGS)
+    .filter(([mode]) => compareResults[mode])
+    .map(([mode, cfg]) => {
+      const isPrimary = mode === primaryMode;
+      return {
+        label: cfg.label,
+        data: compareResults[mode].percentiles[50],
+        borderColor: cfg.color,
+        backgroundColor: 'transparent',
+        borderWidth: isPrimary ? 3 : 1.5,
+        borderDash: isPrimary ? [] : [6, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+        order: isPrimary ? 0 : 1,
+      };
+    });
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: { usePointStyle: true, pointStyleWidth: 16, padding: 16, font: { size: 12 } },
+        },
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              return ` ${ctx.dataset.label}: ${formatTHB(ctx.parsed.y)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { maxTicksLimit: 12, font: { size: 11 }, maxRotation: 45 }
+        },
+        y: {
+          grid: { color: '#f3f4f6' },
+          ticks: { font: { size: 11 }, callback: v => formatTHBCompact(v) }
+        }
+      }
+    }
+  });
+
+  return chartInstance;
 }
 
 /**

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Methodology — Unit Linked Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ── Page-specific styles (mirrors changelog.html) ─────────────── */
+
+    .cl-nav { display:flex; align-items:center; gap:8px; margin-bottom:28px; }
+    .cl-nav a { color:var(--primary); text-decoration:none; font-size:13px; font-weight:600; }
+    .cl-nav a:hover { text-decoration:underline; }
+    .cl-nav-sep { color:var(--gray-400); font-size:13px; }
+
+    .badge {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:2px 9px; border-radius:12px; font-size:11px;
+      font-weight:700; letter-spacing:.3px; text-transform:uppercase;
+      vertical-align:middle;
+    }
+    .badge-math  { background:#faf5ff; color:#7c3aed; border:1px solid #e9d5ff; }
+    .badge-stats { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+    .badge-eng   { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+    .badge-warn  { background:#fef9c3; color:#854d0e; border:1px solid #fde68a; }
+
+    .fix-card {
+      background:#fff; border-radius:var(--radius);
+      box-shadow:var(--shadow); margin-bottom:24px; overflow:hidden;
+    }
+    .fix-header {
+      display:flex; align-items:flex-start; justify-content:space-between;
+      gap:16px; padding:18px 24px 14px; border-bottom:1px solid var(--gray-100);
+    }
+    .fix-title  { font-size:16px; font-weight:700; color:var(--gray-900); margin-bottom:4px; }
+    .fix-file   { font-size:12px; color:var(--gray-500); font-family:'Consolas','Courier New',monospace; }
+    .fix-body   { padding:18px 24px; }
+
+    .fix-section-label {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.6px; color:var(--gray-400); margin:14px 0 6px;
+    }
+    .fix-section-label:first-child { margin-top:0; }
+
+    pre {
+      background:#1e1e2e; color:#cdd6f4; border-radius:6px;
+      padding:14px 16px; font-size:12.5px;
+      font-family:'Consolas','Courier New',monospace;
+      overflow-x:auto; line-height:1.6; margin:0;
+    }
+    code {
+      font-family:'Consolas','Courier New',monospace;
+      background:var(--gray-100); color:#7c3aed;
+      padding:1px 5px; border-radius:3px; font-size:13px;
+    }
+    pre code { background:none; color:inherit; padding:0; }
+    .cmt { color:#6c7086; font-style:italic; }
+    .kw  { color:#cba6f7; }
+    .fn  { color:#89b4fa; }
+    .num { color:#fab387; }
+    .str { color:#a6e3a1; }
+
+    .math-box {
+      background:var(--gray-50); border:1px solid var(--gray-200);
+      border-left:3px solid var(--primary);
+      border-radius:0 var(--radius) var(--radius) 0;
+      padding:10px 14px; font-size:13px;
+      font-family:'Consolas','Courier New',monospace;
+      color:var(--gray-700); margin-top:10px; line-height:1.8;
+    }
+
+    .impact-box {
+      display:flex; align-items:flex-start; gap:10px;
+      background:#f0fdf4; border:1px solid #bbf7d0;
+      border-radius:var(--radius); padding:12px 14px;
+      font-size:13px; color:#166534; margin-top:14px;
+    }
+    .impact-box .impact-icon { font-size:16px; flex-shrink:0; }
+
+    .warn-box {
+      display:flex; align-items:flex-start; gap:10px;
+      background:#fef9c3; border:1px solid #fde68a;
+      border-radius:var(--radius); padding:12px 14px;
+      font-size:13px; color:#854d0e; margin-top:14px;
+    }
+
+    .toc {
+      background:var(--primary-light); border:1px solid #b6cfef;
+      border-radius:var(--radius); padding:16px 20px; margin-bottom:28px;
+    }
+    .toc-title { font-size:13px; font-weight:700; color:var(--primary); margin-bottom:10px; }
+    .toc ol { padding-left:18px; display:flex; flex-direction:column; gap:5px; }
+    .toc li { font-size:13px; }
+    .toc a { color:var(--primary); text-decoration:none; }
+    .toc a:hover { text-decoration:underline; }
+
+    .pipeline-step {
+      display:flex; gap:14px; align-items:flex-start;
+      padding:10px 0; border-bottom:1px solid var(--gray-100);
+    }
+    .pipeline-step:last-child { border-bottom:none; }
+    .pipeline-num {
+      width:26px; height:26px; background:var(--primary); color:#fff;
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; flex-shrink:0; margin-top:1px;
+    }
+    .pipeline-label { font-size:14px; font-weight:600; color:var(--gray-800); margin-bottom:2px; }
+    .pipeline-desc  { font-size:13px; color:var(--gray-600); line-height:1.6; }
+
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px; }
+    @media (max-width:640px) { .two-col { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════════════════════════════════════════ -->
+<header>
+  <div>
+    <div class="logo">Unit Linked Simulation</div>
+    <div class="subtitle">Monte Carlo — Insurance Financial Planning Tool</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="index.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      ← กลับ Simulation
+    </a>
+    <a href="changelog.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      Changelog
+    </a>
+  </div>
+</header>
+
+<!-- ═══════════════ MAIN ══════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- Breadcrumb -->
+  <div class="cl-nav">
+    <a href="index.html">Simulation</a>
+    <span class="cl-nav-sep">/</span>
+    <span style="color:var(--gray-700);font-size:13px">Methodology</span>
+  </div>
+
+  <!-- Title -->
+  <div style="margin-bottom:28px">
+    <h1 style="font-size:26px;font-weight:700;color:var(--gray-900);margin-bottom:6px">
+      Simulation Methodology
+    </h1>
+    <p style="font-size:14px;color:var(--gray-500)">
+      วิธีการและสมมติฐานที่ใช้ในการคำนวณ Monte Carlo simulation ทั้งหมด
+    </p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <div class="toc-title">สารบัญ</div>
+    <ol>
+      <li><a href="#overview">ภาพรวม — Pipeline ทั้งหมด</a></li>
+      <li><a href="#data">ข้อมูล Input และการเตรียมข้อมูล</a></li>
+      <li><a href="#stats">การประมาณค่าสถิติ (μ, σ)</a></li>
+      <li><a href="#correlation">Correlation Matrix และ Cholesky Decomposition</a></li>
+      <li><a href="#gbm">โมเดล GBM — การ Simulate NAV</a></li>
+      <li><a href="#dca">DCA Premium และ Offer/BID Pricing</a></li>
+      <li><a href="#rebalance">Rebalancing</a></li>
+      <li><a href="#output">Output — Percentile Bands, Mean, IRR</a></li>
+      <li><a href="#limits">ข้อจำกัดและสมมติฐาน</a></li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       1. Overview
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="overview">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">ภาพรวม — Pipeline ทั้งหมด</div>
+        <div class="fix-file">js/simulation.js · js/app.js</div>
+      </div>
+      <span class="badge badge-eng">Overview</span>
+    </div>
+    <div class="fix-body">
+
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7;margin-bottom:16px">
+        เครื่องมือนี้ใช้ <strong>Monte Carlo simulation</strong> จำลองเส้นทาง NAV
+        ในอนาคตตาม distribution ที่ประมาณจากข้อมูลย้อนหลัง
+        โดยรัน N scenarios (default 1,000) แต่ละ scenario คือการจำลองพอร์ตทีละเดือน
+        ตลอดระยะเวลาที่กำหนด แล้วสรุปผลเป็น percentile bands
+      </p>
+
+      <div class="fix-section-label">Pipeline ลำดับขั้นตอน</div>
+      <div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">1</div>
+          <div>
+            <div class="pipeline-label">โหลดและ Resample ข้อมูล NAV</div>
+            <div class="pipeline-desc">รับข้อมูล daily → แปลงเป็น monthly end-of-month ก่อนใช้งาน</div>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">2</div>
+          <div>
+            <div class="pipeline-label">ประมาณค่า μ, σ รายกองทุน</div>
+            <div class="pipeline-desc">คำนวณ monthly log-return mean และ std (sample variance) จากข้อมูลจริง</div>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">3</div>
+          <div>
+            <div class="pipeline-label">คำนวณ Covariance Matrix และ Cholesky L</div>
+            <div class="pipeline-desc">หา correlation ระหว่างกองทุน แล้วแยกสลาย Cholesky เพื่อสร้าง correlated shocks</div>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">4</div>
+          <div>
+            <div class="pipeline-label">รัน N Scenarios (GBM)</div>
+            <div class="pipeline-desc">แต่ละเดือน: simulate NAV → บวกเบี้ย (DCA) → หัก fees → Rebalance → บันทึกมูลค่า</div>
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">5</div>
+          <div>
+            <div class="pipeline-label">สรุป Output</div>
+            <div class="pipeline-desc">คำนวณ percentile bands (P25/P50/P75/P98), mean series, และ IRR แต่ละ scenario</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       2. Data
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="data">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">ข้อมูล Input และการเตรียมข้อมูล</div>
+        <div class="fix-file">simulation.js · resampleMonthly()</div>
+      </div>
+      <span class="badge badge-eng">Data</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">รูปแบบข้อมูลที่รับ</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แต่ละกองทุนต้องมีข้อมูล <strong>NAV รายวัน</strong> (หรือรายเดือน) ในรูปแบบ:
+      </p>
+      <div class="math-box">
+        คอลัมน์: วันที่ (DD/MM/YYYY) | NAV | Offer | BID<br>
+        ต้นกำเนิด: ไฟล์ XLS/XLSX หรือ CSV<br>
+        ข้อมูลหลายกองทุนสามารถอยู่ในไฟล์เดียวกันได้
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Offer vs BID Pricing</div>
+      <div class="two-col">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#1d4ed8;margin-bottom:4px">Offer Price — ราคาซื้อ</div>
+          ใช้เมื่อ <strong>ซื้อหน่วย</strong> จากการจ่ายเบี้ยประกัน<br>
+          มักสูงกว่า NAV เล็กน้อย (spread)
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#15803d;margin-bottom:4px">BID Price — ราคาประเมิน</div>
+          ใช้เมื่อ <strong>ประเมินมูลค่า</strong> พอร์ต และเมื่อ Rebalance<br>
+          มักต่ำกว่า NAV เล็กน้อย
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Daily → Monthly Resampling</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        Simulation วิ่งทีละ <strong>1 เดือน</strong> ดังนั้นต้องแปลงข้อมูล daily เป็น monthly ก่อน
+        โดยเก็บ <strong>ค่า NAV สุดท้ายของแต่ละเดือน</strong> (end-of-month)
+        ถ้าไม่ทำขั้นตอนนี้ mean return จะถูก understate ประมาณ <strong>21 เท่า</strong>
+      </p>
+      <pre><code><span class="cmt">// ตรวจ: ถ้า avg gap &lt; 20 วัน = daily data → ต้อง resample</span>
+<span class="kw">const</span> avgGapDays = spanDays / (rows.length - <span class="num">1</span>);
+<span class="kw">if</span> (avgGapDays >= <span class="num">20</span>) <span class="kw">return</span> rows; <span class="cmt">// monthly แล้ว</span>
+
+<span class="cmt">// Group by YYYY-MM → เก็บ row สุดท้ายของแต่ละเดือน</span>
+<span class="kw">const</span> byMonth = <span class="kw">new</span> Map();
+<span class="kw">for</span> (<span class="kw">const</span> row <span class="kw">of</span> rows) {
+  <span class="kw">const</span> key = <span class="str">`\${year}-\${month}`</span>;
+  byMonth.<span class="fn">set</span>(key, row); <span class="cmt">// later row overwrites → end-of-month</span>
+}</code></pre>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       3. Stats Estimation
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="stats">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">การประมาณค่าสถิติ — Monthly μ และ σ</div>
+        <div class="fix-file">simulation.js · calcFundStats()</div>
+      </div>
+      <span class="badge badge-math">Statistics</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">Log-Return</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ใช้ <strong>log-return</strong> แทน arithmetic return เพราะ log-return มีคุณสมบัติ additive
+        ตามเวลา และ assume distribution เป็น Normal ได้ดีกว่า
+      </p>
+      <div class="math-box">
+        r_t = ln(NAV_t / NAV_{t−1})<br><br>
+        μ̂  = (1/T) · Σ r_t          &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#6c7086">← mean log-return รายเดือน</span><br>
+        σ̂² = (1/(T−1)) · Σ (r_t − μ̂)²  &nbsp;&nbsp;<span style="color:#6c7086">← sample variance (Bessel's correction)</span><br>
+        σ̂  = √σ̂²                    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#6c7086">← monthly std</span>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Bessel's Correction (หาร n−1 ไม่ใช่ n)</div>
+      <p style="font-size:13px;color:var(--gray-700)">
+        ข้อมูลย้อนหลังคือ <em>ตัวอย่าง</em> ไม่ใช่ประชากรทั้งหมด
+        การหาร n ให้ variance ที่ต่ำกว่าจริง (biased downward)
+        การหาร <strong>n−1</strong> แก้ค่าเบี่ยงเบนนี้ และเป็น unbiased estimator ของ population variance
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">Offer/BID Ratios</div>
+      <p style="font-size:13px;color:var(--gray-700)">
+        เฉลี่ยอัตราส่วน <code>offer/nav</code> และ <code>bid/nav</code> จากข้อมูลทุก row
+        แล้วนำ ratios เหล่านี้ไปปรับ simulated NAV ทุกเดือนขณะ simulation
+      </p>
+      <div class="math-box">
+        offerRatio = avg(offer_t / nav_t)  ← ใช้คูณ NAV เมื่อซื้อหน่วย<br>
+        bidRatio   = avg(bid_t   / nav_t)  ← ใช้คูณ NAV เมื่อประเมินมูลค่า
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       4. Correlation / Cholesky
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="correlation">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Correlation Matrix และ Cholesky Decomposition</div>
+        <div class="fix-file">simulation.js · getAlignedMonthlyReturns() · computeCovMatrix() · cholesky()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-math">Math</span>
+        <span class="badge badge-stats">Statistics</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ทำไมต้องใช้ Correlation</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        ถ้า simulate แต่ละกองทุนแบบ <strong>independent</strong>
+        ความผันผวนของ portfolio จะต่ำกว่าความเป็นจริง เพราะกองทุน equity
+        มักเคลื่อนไหวไปในทิศทางเดียวกันในช่วงที่ตลาดผันผวน
+        การ ignore correlation ทำให้ diversification ถูก overestimate
+      </p>
+
+      <div class="fix-section-label">ขั้นตอน</div>
+      <div class="math-box">
+        <strong>Step 1 — Align returns:</strong><br>
+        &nbsp;&nbsp;หา intersection ของเดือนที่ข้อมูลครบทุกกองทุน<br>
+        &nbsp;&nbsp;สร้าง return matrix R[i][t] = log(NAV_{i,t} / NAV_{i,t-1})<br><br>
+        <strong>Step 2 — Sample Covariance:</strong><br>
+        &nbsp;&nbsp;Σ[i][j] = (1/(T−1)) · Σ_t (R[i][t] − μ_i)(R[j][t] − μ_j)<br><br>
+        <strong>Step 3 — Cholesky Decomposition:</strong><br>
+        &nbsp;&nbsp;หา lower-triangular L ที่ทำให้ L · Lᵀ = Σ<br><br>
+        <strong>Step 4 — Correlated Shocks:</strong><br>
+        &nbsp;&nbsp;z ~ N(0, I)  →  w = L · z  →  Cov(w) = L·Lᵀ = Σ
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">ใน Simulation</div>
+      <pre><code><span class="cmt">// ทุกเดือน: draw independent standard normals</span>
+<span class="kw">const</span> z = Array.<span class="fn">from</span>({ length: nFunds }, randNormal); <span class="cmt">// z ~ N(0,I)</span>
+
+<span class="cmt">// Multiply by Cholesky L → correlated shocks</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; nFunds; i++) {
+  <span class="kw">let</span> shock = <span class="num">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> k = <span class="num">0</span>; k &lt;= i; k++) shock += L[i][k] * z[k]; <span class="cmt">// w = L·z</span>
+  nav[funds[i]] *= Math.<span class="fn">exp</span>(μ_i + shock); <span class="cmt">// GBM update</span>
+}</code></pre>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>กรณี Single Fund:</strong> L = [[σ]] — เหมือนกับ GBM ปกติทุกประการ
+          ไม่มี overhead จาก Cholesky
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       5. GBM
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="gbm">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">โมเดล GBM — การ Simulate NAV แต่ละเดือน</div>
+        <div class="fix-file">simulation.js · runScenario() · randNormal()</div>
+      </div>
+      <span class="badge badge-math">Math</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">Geometric Brownian Motion (Discrete Time)</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        NAV แต่ละเดือนถูก simulate ตามโมเดล GBM แบบ discrete:
+      </p>
+      <div class="math-box">
+        NAV_t = NAV_{t−1} · exp(μ + w_t)<br><br>
+        เมื่อ  w_t ~ N(0, σ²)  สำหรับกองทุนเดียว<br>
+        หรือ   w = L · z       สำหรับหลายกองทุน (correlated)<br><br>
+        μ = monthly log-return mean (ประมาณจากข้อมูลจริง)<br>
+        σ = monthly log-return std  (ประมาณจากข้อมูลจริง)
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Box-Muller Transform — การสุ่มค่า Normal</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ใช้ Box-Muller transform แปลง Uniform random → Standard Normal
+        ซึ่งถูกต้องทางสถิติและเร็วกว่า Central Limit Theorem approximation
+      </p>
+      <div class="math-box">
+        U₁, U₂ ~ Uniform(0,1)<br>
+        Z = √(−2 ln U₁) · cos(2π U₂)  →  Z ~ N(0,1)
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Volatility Drag (Itô Correction)</div>
+      <p style="font-size:13px;color:var(--gray-700)">
+        เนื่องจากโมเดลใช้ log-return mean (μ) โดยตรง
+        arithmetic drift จริงของ NAV คือ <strong>exp(μ + σ²/2)</strong>
+        ดังนั้น μ = 0 หมายถึง arithmetic drift เป็นบวก ไม่ใช่ zero
+        ในทางกลับกัน median NAV จะลดลงตามเวลาเมื่อ μ = −σ²/2 (zero arithmetic drift)
+      </p>
+      <div class="math-box">
+        E[NAV_t / NAV_0] = exp(μ + σ²/2) · t  &nbsp;&nbsp;<span style="color:#6c7086">← arithmetic mean path</span><br>
+        median(NAV_t / NAV_0) = exp(μ · t)     &nbsp;&nbsp;<span style="color:#6c7086">← median path (lower)</span><br><br>
+        ผล: distribution ของ final value เป็น <strong>right-skewed</strong><br>
+        → ค่าเฉลี่ย (mean) &gt; ผลลัพธ์ทั่วไป (median) เสมอเมื่อ σ &gt; 0
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       6. DCA
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="dca">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">DCA Premium Contributions และ Offer/BID Pricing</div>
+        <div class="fix-file">simulation.js · runScenario() · buildPremiumMonths()</div>
+      </div>
+      <span class="badge badge-eng">DCA</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">Premium Month Set</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เบี้ยถูกจ่ายเป็น Set ของ 0-based month indices ที่ pre-compute ไว้ล่วงหน้า
+        หลีกเลี่ยง conditional logic ใน hot loop
+      </p>
+      <div class="math-box">
+        monthly:     {0, 1, 2, 3, …, T−1}<br>
+        quarterly:   {0, 3, 6, 9, …}<br>
+        semi-annual: {0, 6, 12, 18, …}<br>
+        annual:      {0, 12, 24, …}
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">การซื้อหน่วยลงทุน</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เมื่อถึงเดือนที่จ่ายเบี้ย จะซื้อหน่วยที่ <strong>Offer price</strong> ตามสัดส่วน allocation:
+      </p>
+      <div class="math-box">
+        หน่วยที่ซื้อ_f = (เบี้ย × allocation_f) / (NAV_f × offerRatio_f)
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">ลำดับการทำงานในแต่ละเดือน</div>
+      <div class="math-box">
+        1. Simulate NAV movement  (GBM + correlated shocks)<br>
+        2. ซื้อหน่วยที่ Offer price (ถ้าเป็นเดือนที่จ่ายเบี้ย)<br>
+        3. หัก Fees (v1: no-op; hook สำหรับเพิ่มในอนาคต)<br>
+        4. Rebalance (ถ้าตรงตาม schedule)<br>
+        5. บันทึกมูลค่าพอร์ตที่ BID price
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       7. Rebalancing
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="rebalance">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Rebalancing — การปรับสมดุลพอร์ต</div>
+        <div class="fix-file">simulation.js · rebalance()</div>
+      </div>
+      <span class="badge badge-eng">Portfolio</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">กลไก</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        Rebalancing เกิดขึ้น <em>หลังจาก</em> fee deduction และ premium contribution
+        ในแต่ละเดือนที่กำหนด (monthly, quarterly, annual)
+      </p>
+      <div class="math-box">
+        1. ประเมินมูลค่าพอร์ตรวมที่ BID price<br>
+        2. Re-allocate: ซื้อทุกกองทุนใหม่ที่ Offer price ตาม target allocation<br><br>
+        ผลสุทธิ: มูลค่ารวมเท่าเดิม แต่สัดส่วนกลับมาตรง target
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Rebalancing Schedules</div>
+      <div class="math-box">
+        monthly:   ทุกเดือน  (m+1) % 1 == 0<br>
+        quarterly: ทุก 3 เดือน  (m+1) % 3 == 0<br>
+        annual:    ทุก 12 เดือน (m+1) % 12 == 0
+      </div>
+
+      <div class="warn-box">
+        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div>
+          Rebalancing ใช้ <strong>Offer price สำหรับซื้อ</strong> และ <strong>BID price สำหรับขาย</strong>
+          ทำให้มี bid-ask spread cost แต่ละครั้งที่ rebalance
+          ยิ่ง rebalance บ่อย ยิ่งสูญเสีย spread มากกว่า
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       8. Output
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="output">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Output — Percentile Bands, Mean Series, IRR</div>
+        <div class="fix-file">simulation.js · runMonteCarlo() · calcIRR()</div>
+      </div>
+      <span class="badge badge-stats">Output</span>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">Percentile Bands</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        หลังจากรัน N scenarios แล้ว จะคำนวณ percentile ที่แต่ละเดือน
+        โดย sort ค่า portfolio value ของทุก scenario ณ เดือนนั้น
+        แล้วเลือก index ที่ตรงกับ percentile ที่ต้องการ
+      </p>
+      <div class="math-box">
+        P_p[m] = sorted_values[floor(p/100 × (N−1))]<br><br>
+        p = 25 → กรณีที่ควรเตรียมรับมือ (Downside)<br>
+        p = 50 → ผลลัพธ์ทั่วไป (Median)<br>
+        p = 75 → กรณีดี (Upside)<br>
+        p = 98 → กรณีดีมาก (Optimistic)
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Mean Series (Streaming)</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        คำนวณ mean ในรูปแบบ streaming pass เดียว ไม่เก็บ allSeries ทั้งหมดใน memory:
+      </p>
+      <pre><code><span class="kw">const</span> meanSeries = <span class="kw">new</span> Array(months).<span class="fn">fill</span>(<span class="num">0</span>);
+<span class="kw">for</span> (<span class="kw">const</span> s <span class="kw">of</span> allSeries) {
+  <span class="kw">for</span> (<span class="kw">let</span> m = <span class="num">0</span>; m &lt; months; m++) meanSeries[m] += s[m];
+}
+<span class="kw">for</span> (<span class="kw">let</span> m = <span class="num">0</span>; m &lt; months; m++) meanSeries[m] /= N;</code></pre>
+
+      <div class="fix-section-label" style="margin-top:16px">IRR — Internal Rate of Return</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ใช้ IRR แทน CAGR เพราะ Unit Linked จ่ายเบี้ยเป็นงวด (DCA)
+        CAGR สมมติว่าลงทุนทั้งหมดตั้งแต่วันแรก ซึ่งทำให้ตัวเลขต่ำกว่าจริงอย่างมีนัยสำคัญ
+      </p>
+      <div class="math-box">
+        หาค่า r_monthly ที่ทำให้:<br>
+        Σ_t premium · (1 + r)^(T − t) = finalValue<br><br>
+        IRR_annual = (1 + r_monthly)^12 − 1<br><br>
+        วิธีหา: Binary search 100 iterations (converges ใน &lt;1μs)
+      </div>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          IRR รองรับทุก payment mode: monthly, quarterly, semi-annual, annual
+          และถูกต้องสำหรับ DCA ที่จ่ายในช่วงเวลาต่างๆ
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       9. Limitations
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="limits">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">ข้อจำกัดและสมมติฐาน</div>
+        <div class="fix-file">ควรทราบก่อนตีความผลลัพธ์</div>
+      </div>
+      <span class="badge badge-warn">Limitations</span>
+    </div>
+    <div class="fix-body">
+
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+
+        <div class="warn-box">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Stationary Parameters</strong><br>
+            μ และ σ ถูก estimate จากข้อมูลอดีตและ<em>คงที่ตลอด simulation</em>
+            ในความเป็นจริง return distribution เปลี่ยนไปตามรอบเศรษฐกิจ
+          </div>
+        </div>
+
+        <div class="warn-box">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Log-Normal Distribution</strong><br>
+            โมเดลสมมติว่า log-return เป็น Normal distribution
+            แต่ return จริงมักมี fat tail (extreme events บ่อยกว่า Normal)
+            ทำให้ downside scenarios อาจ underestimate
+          </div>
+        </div>
+
+        <div class="warn-box">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Constant Correlation</strong><br>
+            Correlation matrix ระหว่างกองทุนถูก estimate ครั้งเดียวและคงที่
+            ในความเป็นจริง correlation มักเพิ่มขึ้นในช่วง market crash
+          </div>
+        </div>
+
+        <div class="warn-box">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>ยังไม่มีการหัก Fees</strong><br>
+            v1 ยังไม่ implement fee deductions (admin fee, COI, premium charge)
+            ผลลัพธ์จึงสูงกว่าความเป็นจริงที่มี fee ทุกประเภท
+            Fee hook (<code>applyFees()</code>) เตรียมไว้สำหรับ v2
+          </div>
+        </div>
+
+        <div class="warn-box">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>ข้อมูลประวัติศาสตร์เป็นเพียงการประมาณ</strong><br>
+            ผลการดำเนินงานในอดีตไม่ได้รับประกันผลในอนาคต
+            Simulation นี้เป็น <em>เครื่องมือช่วยวางแผน</em> ไม่ใช่การพยากรณ์
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card" style="background:var(--primary);color:#fff">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">Tech Stack สรุป</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;font-size:13px">
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">โมเดล NAV</div>
+        <div style="opacity:.85">Geometric Brownian Motion (log-normal, discrete monthly)</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Random Normal</div>
+        <div style="opacity:.85">Box-Muller transform จาก Math.random()</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Correlation</div>
+        <div style="opacity:.85">Sample covariance → Cholesky L → w = L·z</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Return Metric</div>
+        <div style="opacity:.85">IRR (binary search) — money-weighted, DCA-correct</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Pricing</div>
+        <div style="opacity:.85">ซื้อ = Offer · ratio · allocation / units</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">Tests</div>
+        <div style="opacity:.85">78 assertions · 8 suites · node tools/test-simulation.js</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>

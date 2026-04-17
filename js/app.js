@@ -30,6 +30,10 @@ const state = {
 
   results: null,
   selectedPcts: [25, 50, 75, 98],
+  showMean: true,           // toggle for mean overlay on chart
+
+  compareRebalance: false,  // compare-mode toggle
+  compareResults: null,     // { monthly, quarterly, annual } — cached when compare mode runs
 };
 
 // ─── Step management ─────────────────────────────────────────────────────────
@@ -421,33 +425,54 @@ function buildParamsStep() {
 }
 
 function buildPeriodOptions() {
-  const { jointMonths, jointInceptionDate, jointEndDate } = state;
   const container = document.getElementById('periodOptions');
   container.innerHTML = '';
-  state.selectedPeriod = null;
 
-  const opts = [];
-  if (jointMonths >= 12)  opts.push({ label: '1 ปี',  months: 12 });
-  if (jointMonths >= 36)  opts.push({ label: '3 ปี',  months: 36 });
-  if (jointMonths >= 60)  opts.push({ label: '5 ปี',  months: 60 });
+  const DEFAULT_YEARS = 10;
+  state.selectedPeriod = DEFAULT_YEARS * 12;
 
-  const sinceLabel = jointInceptionDate
-    ? `ตั้งแต่ Joint Inception (${(jointMonths / 12).toFixed(1)} ปี)`
-    : 'ตั้งแต่ Joint Inception';
-  opts.push({ label: sinceLabel, months: jointMonths });
+  // ── Preset buttons ──────────────────────────────────────────────
+  const presetsRow = document.createElement('div');
+  presetsRow.className = 'period-presets';
 
-  opts.forEach(opt => {
+  [5, 10, 20].forEach(years => {
     const btn = document.createElement('button');
-    btn.className = 'period-btn';
-    btn.textContent = opt.label;
+    btn.className = 'period-btn' + (years === DEFAULT_YEARS ? ' selected' : '');
+    btn.textContent = `${years} ปี`;
     btn.addEventListener('click', () => {
       container.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      state.selectedPeriod = opt.months;
-      updateJointInfo();
+      customInput.value = '';
+      state.selectedPeriod = years * 12;
     });
-    container.appendChild(btn);
+    presetsRow.appendChild(btn);
   });
+  container.appendChild(presetsRow);
+
+  // ── Custom input ─────────────────────────────────────────────────
+  const customRow = document.createElement('div');
+  customRow.className = 'period-custom-row';
+  customRow.innerHTML = `
+    <span class="period-custom-label">กำหนดเอง</span>
+    <input type="number" class="period-custom-input" min="1" max="30" step="1" placeholder="1–30" />
+    <span class="period-custom-unit">ปี</span>
+  `;
+  container.appendChild(customRow);
+
+  const customInput = customRow.querySelector('.period-custom-input');
+  customInput.addEventListener('input', () => {
+    const v = parseInt(customInput.value);
+    if (v >= 1 && v <= 30) {
+      container.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+      state.selectedPeriod = v * 12;
+    }
+  });
+
+  // ── Helper text ───────────────────────────────────────────────────
+  const hint = document.createElement('p');
+  hint.className = 'period-hint';
+  hint.textContent = 'ระยะเวลาที่ยาวขึ้นมาพร้อมกับความไม่แน่นอนที่สูงขึ้น';
+  container.appendChild(hint);
 
   updateJointInfo();
 }
@@ -456,14 +481,12 @@ function updateJointInfo() {
   const { jointInceptionDate, jointEndDate, jointMonths } = state;
   const box = document.getElementById('jointInfo');
   if (!jointInceptionDate) { box.style.display = 'none'; return; }
-  const fmt = d => d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fmt = d => d.toLocaleDateString('th-TH', { year: 'numeric', month: 'long' });
   box.style.display = 'block';
   box.innerHTML = `
-    <strong>Joint Inception:</strong> ${fmt(jointInceptionDate)}
-    &nbsp;→&nbsp;
-    <strong>ข้อมูลล่าสุด:</strong> ${fmt(jointEndDate)}
-    &nbsp;|&nbsp;
-    <strong>ระยะเวลา:</strong> ${(jointMonths / 12).toFixed(2)} ปี (${jointMonths} เดือน)
+    📊 ใช้ข้อมูลย้อนหลัง <strong>${(jointMonths / 12).toFixed(1)} ปี</strong>
+    (${fmt(jointInceptionDate)} – ${fmt(jointEndDate)})
+    เพื่อประมาณค่า return และความผันผวน — ไม่ส่งผลต่อระยะเวลาที่เลือก
   `;
 }
 
@@ -506,8 +529,9 @@ function updateAllocTotal() {
 document.getElementById('btnNext2').addEventListener('click', () => {
   state.premium       = parseFloat(document.getElementById('inputPremium').value) || 5000;
   state.paymentMode   = document.getElementById('selectPayment').value;
-  state.rebalanceMode = document.querySelector('input[name="rebalance"]:checked')?.value || 'none';
-  state.N             = parseInt(document.getElementById('inputN').value) || 1000;
+  state.rebalanceMode    = document.querySelector('input[name="rebalance"]:checked')?.value || 'none';
+  state.N                = parseInt(document.getElementById('inputN').value) || 1000;
+  state.compareRebalance = document.getElementById('cbCompareRebalance').checked;
 
   if (!state.selectedPeriod) { alert('กรุณาเลือกระยะเวลา Simulation'); return; }
   const allocTotal = Object.values(state.allocation).reduce((s, v) => s + v, 0);
@@ -535,11 +559,14 @@ function renderRunSummary() {
   const modeLabel  = { monthly:'รายเดือน', quarterly:'รายไตรมาส', 'semi-annual':'ราย 6 เดือน', annual:'รายปี' };
   const rebalLabel = { none:'ไม่มี', monthly:'รายเดือน', quarterly:'รายไตรมาส', annual:'รายปี' };
   const funds = s.fundNames.map(f => `${f} ${s.allocation[f]}%`).join(', ');
+  const rebalDisplay = s.compareRebalance
+    ? '<span style="color:var(--primary);font-weight:700">เปรียบเทียบ 4 กลยุทธ์ (ไม่ปรับ / รายเดือน / รายไตรมาส / รายปี)</span>'
+    : (rebalLabel[s.rebalanceMode] || s.rebalanceMode);
   document.getElementById('simSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 28px">
       <div>💰 <strong>เบี้ย:</strong> ฿${(s.premium||0).toLocaleString()} / ${modeLabel[s.paymentMode]||s.paymentMode}</div>
       <div>📅 <strong>ระยะเวลา:</strong> ${periodLabel}</div>
-      <div>⚖️ <strong>Rebalancing:</strong> ${rebalLabel[s.rebalanceMode]||s.rebalanceMode}</div>
+      <div>⚖️ <strong>Rebalancing:</strong> ${rebalDisplay}</div>
       <div>🎲 <strong>Monte Carlo N:</strong> ${(s.N||0).toLocaleString()} รอบ</div>
       <div style="grid-column:1/-1">🥧 <strong>Allocation:</strong> ${funds}</div>
       <div style="grid-column:1/-1;font-size:12px;color:var(--gray-500)">
@@ -557,18 +584,40 @@ async function runSimulation() {
   document.getElementById('progressBar').style.width = '0%';
   document.getElementById('progressText').textContent = '0%';
 
-  try {
-    const results = await runMonteCarlo({
-      navData: state.navData, allocation: state.allocation,
-      premium: state.premium, paymentMode: state.paymentMode,
-      months: state.selectedPeriod, rebalanceMode: state.rebalanceMode,
-      N: state.N, feeParams: {},
-    }, pct => {
-      document.getElementById('progressBar').style.width = pct + '%';
-      document.getElementById('progressText').textContent = pct + '%';
-    });
+  function setProgress(pct) {
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = Math.round(pct) + '%';
+  }
 
-    state.results = results;
+  const baseConfig = {
+    navData: state.navData, allocation: state.allocation,
+    premium: state.premium, paymentMode: state.paymentMode,
+    months: state.selectedPeriod, N: state.N, feeParams: {},
+  };
+
+  try {
+    if (state.compareRebalance) {
+      // Run 3 simulations sequentially; each gets 1/3 of the progress bar
+      const modes = ['none', 'monthly', 'quarterly', 'annual'];
+      const compareResults = {};
+      for (let i = 0; i < modes.length; i++) {
+        compareResults[modes[i]] = await runMonteCarlo(
+          { ...baseConfig, rebalanceMode: modes[i] },
+          pct => setProgress((i * 100 + pct) / modes.length)
+        );
+      }
+      state.compareResults = compareResults;
+      // Primary mode drives the summary panel
+      const primary = modes.includes(state.rebalanceMode) ? state.rebalanceMode : 'none';
+      state.results = compareResults[primary];
+    } else {
+      state.compareResults = null;
+      state.results = await runMonteCarlo(
+        { ...baseConfig, rebalanceMode: state.rebalanceMode },
+        setProgress
+      );
+    }
+
     buildResultsStep();
     goToStep(3);
   } catch (err) {
@@ -581,15 +630,321 @@ async function runSimulation() {
   }
 }
 
+// ─── Step 4: Results helpers ──────────────────────────────────────────────────
+
+/** Total premium paid over the simulation period. */
+function simTotalPremium() {
+  const step = simPaymentStep();
+  const { months } = state.results;
+  let n = 0;
+  for (let m = 0; m < months; m += step) n++;
+  return state.premium * n;
+}
+
+/** Number of months between premium payments (1 = monthly, 3 = quarterly, …). */
+function simPaymentStep() {
+  return { monthly: 1, quarterly: 3, 'semi-annual': 6, annual: 12 }[state.paymentMode] || 1;
+}
+
+/** Format IRR as "+X.XX%" / "-X.XX%" string, or "-" if null. */
+function fmtIRR(irr) {
+  if (irr === null) return '-';
+  return (irr >= 0 ? '+' : '') + irr.toFixed(2) + '%';
+}
+
 // ─── Step 4: Results ──────────────────────────────────────────────────────────
+
 function buildResultsStep() {
-  renderPercentileChart();
-  buildSummaryTable();
+  const isCompare = state.compareRebalance && state.compareResults;
+
+  // Toggle chart-area elements depending on mode
+  document.querySelector('.pct-options').style.display        = isCompare ? 'none' : '';
+  document.getElementById('rebalCompareInsight').style.display = isCompare ? '' : 'none';
+
+  renderOutcomeSummary();    // 3-column summary — always uses state.results (primary mode)
+
+  if (isCompare) {
+    renderCompareRebalChart();    // P50 overlay of all 3 frequencies
+    renderRebalCompareInsight();  // dynamic insight text
+  } else {
+    renderPercentileChart();      // normal percentile chart with mean overlay
+  }
+
+  renderRiskFraming();      // probability statements
+  buildSummaryTable();      // detailed table
 }
 
 function renderPercentileChart() {
   const ctx = document.getElementById('simulationChart').getContext('2d');
-  renderChart(ctx, state.results.percentiles, state.results.months, state.selectedPcts, new Date());
+  renderChart(
+    ctx,
+    state.results.percentiles,
+    state.results.months,
+    state.selectedPcts,
+    new Date(),
+    { meanSeries: state.showMean ? state.results.meanSeries : null }
+  );
+}
+
+/** Render P50-only comparison chart for all 3 rebalance frequencies. */
+function renderCompareRebalChart() {
+  const ctx = document.getElementById('simulationChart').getContext('2d');
+  const primaryMode = ['none', 'monthly', 'quarterly', 'annual'].includes(state.rebalanceMode)
+    ? state.rebalanceMode : null;
+  renderCompareRebalanceChart(ctx, state.compareResults, primaryMode, new Date());
+}
+
+/** Generate the compare-rebalance insight card with side-by-side table + insight text. */
+function renderRebalCompareInsight() {
+  const el = document.getElementById('rebalCompareInsight');
+  if (!el || !state.compareResults) return;
+
+  const cr         = state.compareResults;
+  const months     = state.results.months;
+  const totalPaid  = simTotalPremium();
+  const step       = simPaymentStep();
+  const primaryMode = ['none', 'monthly', 'quarterly', 'annual'].includes(state.rebalanceMode)
+    ? state.rebalanceMode : null;
+
+  const MODES = ['none', 'monthly', 'quarterly', 'annual'];
+  const nameMap  = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
+  const colorMap = { none: '#9ca3af',       monthly: '#1a56a0',  quarterly: '#e8a020',   annual: '#16a34a' };
+
+  // Compute per-mode stats
+  const rows = MODES.map(mode => {
+    const p50   = cr[mode].percentiles[50][months - 1];
+    const profit = p50 - totalPaid;
+    const irr   = calcIRR(state.premium, step, months, p50);
+    return { mode, p50, profit, irr };
+  });
+
+  // Find best P50
+  const bestP50 = Math.max(...rows.map(r => r.p50));
+
+  // Build table rows
+  const rowsHTML = rows.map(r => {
+    const isBest    = r.p50 === bestP50;
+    const isPrimary = r.mode === primaryMode;
+    const profitCls = r.profit >= 0 ? 'positive' : 'negative';
+    const irrCls    = r.irr !== null && r.irr >= 0 ? 'positive' : 'negative';
+
+    const badge = isBest
+      ? `<span class="rc-badge rc-badge--best">ดีที่สุด</span>`
+      : isPrimary
+        ? `<span class="rc-badge rc-badge--primary">ที่เลือก</span>`
+        : '';
+
+    return `
+      <tr class="${isBest ? 'rc-row--best' : ''}">
+        <td>
+          <span class="rc-dot" style="background:${colorMap[r.mode]}"></span>
+          ${nameMap[r.mode]}${badge}
+        </td>
+        <td class="rc-num">${fmtTHB(r.p50)}</td>
+        <td class="rc-num ${profitCls}">${r.profit >= 0 ? '+' : ''}${fmtTHB(r.profit)}</td>
+        <td class="rc-num ${irrCls}">${r.irr !== null ? fmtIRR(r.irr) : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  // Insight text
+  const worstP50 = Math.min(...rows.map(r => r.p50));
+  const diffPct  = worstP50 > 0 ? ((bestP50 - worstP50) / worstP50 * 100) : 0;
+  const bestModeName = nameMap[rows.find(r => r.p50 === bestP50).mode];
+
+  let insight;
+  if (diffPct < 1) {
+    insight = 'ทั้ง 3 ความถี่ให้ผลลัพธ์ใกล้เคียงกันมาก สำหรับพอร์ตนี้การปรับสมดุลบ่อยหรือน้อยแทบไม่มีผลต่อมูลค่าสุดท้าย';
+  } else if (diffPct < 5) {
+    insight = `กลยุทธ์${bestModeName}ให้ผลลัพธ์ทั่วไปสูงกว่าเล็กน้อย (${diffPct.toFixed(1)}%) แต่ความแตกต่างไม่มาก — ทุกความถี่เหมาะสมสำหรับพอร์ตนี้`;
+  } else {
+    insight = `กลยุทธ์${bestModeName}ให้ผลลัพธ์ทั่วไปดีที่สุดสำหรับพอร์ตและระยะเวลานี้ สูงกว่าความถี่ที่ด้อยที่สุดประมาณ ${diffPct.toFixed(1)}%`;
+  }
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title"><span class="icon">⚖️</span> เปรียบเทียบความถี่การปรับสมดุล</div>
+
+      <table class="rc-table">
+        <thead>
+          <tr>
+            <th>ความถี่</th>
+            <th class="rc-num">ผลลัพธ์ทั่วไป (P50)</th>
+            <th class="rc-num">กำไร / ขาดทุน</th>
+            <th class="rc-num">IRR</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+
+      <p class="rc-insight">💡 ${insight}</p>
+    </div>
+  `;
+}
+
+/**
+ * Render the top-of-results summary panel.
+ * Shows Average / Typical (Median) / Downside side-by-side,
+ * plus a mean-vs-median comparison block explaining the skew.
+ */
+function renderOutcomeSummary() {
+  const el = document.getElementById('resultSummaryPanel');
+  if (!el) return;
+
+  const { percentiles, months, meanSeries } = state.results;
+  const totalPaid = simTotalPremium();
+  const step      = simPaymentStep();
+
+  // Guard: meanSeries may be absent if simulation.js was cached before mean was added.
+  // In that case fall back to the P75 value as a rough proxy and show a warning.
+  const hasMean   = Array.isArray(meanSeries) && meanSeries.length === months;
+  const meanFinal = hasMean ? meanSeries[months - 1] : null;
+  const p50Final  = percentiles[50][months - 1];
+  const p25Final  = percentiles[25][months - 1];
+
+  const meanIRR = hasMean ? calcIRR(state.premium, step, months, meanFinal) : null;
+  const p50IRR  = calcIRR(state.premium, step, months, p50Final);
+  const p25IRR  = calcIRR(state.premium, step, months, p25Final);
+
+  // Positive/negative class for IRR display
+  function irrCls(irr) { return irr === null ? '' : irr >= 0 ? 'positive' : 'negative'; }
+
+  // The gap between mean and median (mean > median for a right-skewed distribution)
+  const gap        = hasMean ? (meanFinal - p50Final) : null;
+  const gapPct     = (hasMean && totalPaid > 0) ? (gap / totalPaid * 100) : null;
+  // Relative gap vs median — drives insight tone
+  const relGapPct  = (hasMean && p50Final > 0) ? ((meanFinal - p50Final) / p50Final * 100) : null;
+
+  function mmcInsight(relGap) {
+    if (relGap === null) return '';
+    if (relGap < 5)
+      return 'ค่าเฉลี่ยอาจสูงกว่าเล็กน้อย'
+           + ' แต่ผลลัพธ์ที่คนส่วนใหญ่จะเจอคือ <strong>ผลลัพธ์ทั่วไป</strong>'
+           + ' — ควรใช้ค่านี้ในการวางแผน';
+    if (relGap < 20)
+      return 'ค่าเฉลี่ยถูกดึงสูงขึ้นจากบางกรณีที่ได้ผลดีมาก'
+           + ' ผลลัพธ์ที่คุณมีโอกาสได้รับจริงใกล้เคียงกับ <strong>ผลลัพธ์ทั่วไป</strong>'
+           + ' มากกว่า — ใช้ตัวเลขนี้เป็นเกณฑ์หลักในการวางแผน';
+    return 'ค่าเฉลี่ยสูงกว่าผลลัพธ์จริงที่คนส่วนใหญ่จะได้รับ'
+         + ' เพราะถูกดึงขึ้นโดยกรณีที่ดีที่สุดเพียงไม่กี่กรณี'
+         + ' — <strong>ผลลัพธ์ทั่วไป</strong>สะท้อนสิ่งที่คุณควรใช้วางแผนจริงๆ';
+  }
+
+  // Average column — show placeholder when meanSeries is unavailable
+  const avgColHTML = hasMean ? `
+        <div class="outcome-col">
+          <span class="outcome-badge avg">ค่าเฉลี่ย (Average)</span>
+          <div class="outcome-value">${fmtTHB(meanFinal)}</div>
+          <div class="outcome-irr ${irrCls(meanIRR)}">IRR: ${fmtIRR(meanIRR)}</div>
+          <div class="outcome-desc">
+            อาจถูกดึงขึ้นจากบางกรณีที่ได้ผลดีมาก<br>
+            ไม่ใช่สิ่งที่ทุกคนจะได้รับ
+          </div>
+        </div>` : `
+        <div class="outcome-col" style="opacity:.45">
+          <span class="outcome-badge avg">ค่าเฉลี่ย (Average)</span>
+          <div class="outcome-value" style="font-size:16px;color:var(--gray-400)">—</div>
+          <div class="outcome-desc" style="font-size:12px">
+            รีเฟรชหน้าเว็บแล้วรัน<br>
+            เพื่อดูค่าเฉลี่ย
+          </div>
+        </div>`;
+
+  // Mean vs Median comparison block — hide when mean unavailable
+  const compareHTML = hasMean ? `
+      <div class="mean-median-note">
+        <div class="mean-median-compare">
+          <span class="mmc-label">ค่าเฉลี่ย</span>
+          <span class="mmc-val">${fmtTHB(meanFinal)}</span>
+          <span class="mmc-sep" style="color:var(--gray-300);padding:0 4px">vs</span>
+          <span class="mmc-label">ผลลัพธ์ทั่วไป</span>
+          <span class="mmc-val">${fmtTHB(p50Final)}</span>
+          <span class="mmc-sep" style="color:var(--gray-300);padding:0 4px">→</span>
+          <span class="mmc-diff-label">ค่าเฉลี่ยสูงกว่าประมาณ</span>
+          <span class="mmc-diff ${gap >= 0 ? 'positive' : 'negative'}">
+            ${fmtTHB(Math.abs(gap))} (${Math.abs(gapPct).toFixed(1)}%)
+          </span>
+        </div>
+        <p class="mmc-explanation">ℹ️ ${mmcInsight(relGapPct)}</p>
+      </div>` : '';
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title"><span class="icon">📊</span> สรุปผลลัพธ์</div>
+
+      <!-- ── 3-column outcome grid ── -->
+      <div class="outcome-grid">
+        ${avgColHTML}
+
+        <!-- Typical / Median — highlighted as most decision-relevant -->
+        <div class="outcome-col outcome-col--highlight">
+          <span class="outcome-badge med">ผลลัพธ์ทั่วไป (Most Likely)</span>
+          <div class="outcome-value">${fmtTHB(p50Final)}</div>
+          <div class="outcome-irr ${irrCls(p50IRR)}">IRR: ${fmtIRR(p50IRR)}</div>
+          <div class="outcome-desc">
+            มีโอกาส 50% ได้มากกว่านี้<br>
+            และ 50% ได้น้อยกว่านี้
+          </div>
+        </div>
+
+        <!-- Downside / P25 -->
+        <div class="outcome-col">
+          <span class="outcome-badge down">กรณีที่ควรเตรียมรับมือ</span>
+          <div class="outcome-value">${fmtTHB(p25Final)}</div>
+          <div class="outcome-irr ${irrCls(p25IRR)}">IRR: ${fmtIRR(p25IRR)}</div>
+          <div class="outcome-desc">
+            มีโอกาส 1 ใน 4 ที่ผลลัพธ์อาจต่ำกว่านี้<br>
+            ควรเตรียมรับความผันผวนไว้ด้วย
+          </div>
+        </div>
+      </div>
+
+      ${compareHTML}
+    </div>
+  `;
+}
+
+/**
+ * Render the probability framing section below the chart.
+ * Plain-language statements — no jargon, no "percentile".
+ */
+function renderRiskFraming() {
+  const el = document.getElementById('resultRiskFraming');
+  if (!el) return;
+
+  const { percentiles, months } = state.results;
+  const p25 = percentiles[25][months - 1];
+  const p50 = percentiles[50][months - 1];
+  const p75 = percentiles[75][months - 1];
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-title"><span class="icon">🎯</span> โอกาสของผลลัพธ์</div>
+      <div class="risk-grid">
+
+        <div class="risk-item risk-up">
+          <div class="risk-pct">50%</div>
+          <div class="risk-direction">ผลลัพธ์ทั่วไป</div>
+          <div class="risk-phrase">มีโอกาส 50% ที่มูลค่าจะสูงกว่า</div>
+          <div class="risk-value">${fmtTHB(p50)}</div>
+        </div>
+
+        <div class="risk-item risk-down">
+          <div class="risk-pct">1 ใน 4</div>
+          <div class="risk-direction">ควรเตรียมรับมือ</div>
+          <div class="risk-phrase">มีโอกาส 1 ใน 4 ที่มูลค่าอาจต่ำกว่า</div>
+          <div class="risk-value">${fmtTHB(p25)}</div>
+        </div>
+
+        <div class="risk-item risk-up2">
+          <div class="risk-pct">1 ใน 4</div>
+          <div class="risk-direction">กรณีที่ดี</div>
+          <div class="risk-phrase">มีโอกาส 1 ใน 4 ที่มูลค่าจะเกิน</div>
+          <div class="risk-value">${fmtTHB(p75)}</div>
+        </div>
+
+      </div>
+    </div>
+  `;
 }
 
 function buildSummaryTable() {
@@ -597,12 +952,17 @@ function buildSummaryTable() {
   const tbody = document.querySelector('#summaryTable tbody');
   tbody.innerHTML = '';
 
-  const intervals = { monthly: 1, quarterly: 3, 'semi-annual': 6, annual: 12 };
-  const step = intervals[state.paymentMode] || 1;
-  let payments = 0;
-  for (let m = 0; m < months; m += step) payments++;
-  const totalPremium = state.premium * payments;
-  const years = months / 12;
+  const step       = simPaymentStep();
+  const totalPremium = simTotalPremium();
+  const years      = months / 12;
+
+  // Row label: plain language instead of "percentile N"
+  const rowLabels = {
+    98: 'กรณีดีมาก (98%)',
+    75: 'กรณีดี (75%)',
+    50: 'ผลลัพธ์ทั่วไป (50%)',
+    25: 'กรณีที่ควรเตรียมรับมือ (25%)',
+  };
 
   for (const p of [98, 75, 50, 25]) {
     if (!state.selectedPcts.includes(p)) continue;
@@ -610,19 +970,18 @@ function buildSummaryTable() {
     const ret    = final - totalPremium;
     const retPct = totalPremium > 0 ? (ret / totalPremium * 100) : 0;
 
-    // CAGR = (final / totalPremium)^(1/years) - 1
-    // Only meaningful when final > 0 and years > 0
+    // IRR: annualised money-weighted return accounting for DCA timing
     let cagrStr = '-';
     if (final > 0 && totalPremium > 0 && years > 0) {
-      const cagr = (Math.pow(final / totalPremium, 1 / years) - 1) * 100;
-      cagrStr = (cagr >= 0 ? '+' : '') + cagr.toFixed(2) + '%';
+      const irr = calcIRR(state.premium, step, months, final);
+      if (irr !== null) cagrStr = fmtIRR(irr);
     }
 
     const cls     = ret >= 0 ? 'positive' : 'negative';
     const cagrCls = (final >= totalPremium) ? 'positive' : 'negative';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>เปอร์เซ็นไทล์ที่ ${p}</td>
+      <td>${rowLabels[p]}</td>
       <td>${fmtTHB(totalPremium)}</td>
       <td>${fmtTHB(final)}</td>
       <td class="${cls}">${ret >= 0 ? '+' : ''}${fmtTHB(ret)}</td>
@@ -644,6 +1003,17 @@ document.querySelectorAll('.pct-check').forEach(cb => {
     else            { state.selectedPcts = state.selectedPcts.filter(x => x !== p); }
     if (state.results) { renderPercentileChart(); buildSummaryTable(); }
   });
+});
+
+// Mean overlay toggle
+document.getElementById('cbMean').addEventListener('change', e => {
+  state.showMean = e.target.checked;
+  if (state.results) renderPercentileChart();
+});
+
+// Compare-rebalance toggle — show/hide hint text in step 2
+document.getElementById('cbCompareRebalance').addEventListener('change', e => {
+  document.getElementById('compareToggleHint').style.display = e.target.checked ? 'block' : 'none';
 });
 
 document.getElementById('btnExportCSV').addEventListener('click', () => {

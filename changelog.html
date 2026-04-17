@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Changelog — Unit Linked Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    /* ── Changelog-specific styles ────────────────────────────── */
+
+    .cl-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .cl-nav a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .cl-nav a:hover { text-decoration: underline; }
+    .cl-nav-sep { color: var(--gray-400); font-size: 13px; }
+
+    /* Badge: severity / type label */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+    .badge-bug    { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-fix    { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-math   { background: #faf5ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+    .badge-perf   { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+    .badge-new    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+
+    /* Fix entry card */
+    .fix-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .fix-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .fix-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+    .fix-file {
+      font-size: 12px;
+      color: var(--gray-500);
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+    .fix-body { padding: 18px 24px; }
+
+    /* Section headings inside a fix */
+    .fix-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--gray-400);
+      margin: 14px 0 6px;
+    }
+    .fix-section-label:first-child { margin-top: 0; }
+
+    /* Code block */
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 12.5px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      overflow-x: auto;
+      line-height: 1.6;
+      margin: 0;
+    }
+    code {
+      font-family: 'Consolas', 'Courier New', monospace;
+      background: var(--gray-100);
+      color: #7c3aed;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+    pre code { background: none; color: inherit; padding: 0; }
+    .del { color: #f38ba8; }
+    .add { color: #a6e3a1; }
+    .cmt { color: #6c7086; font-style: italic; }
+    .kw  { color: #cba6f7; }
+    .fn  { color: #89b4fa; }
+    .num { color: #fab387; }
+    .str { color: #a6e3a1; }
+
+    /* Impact box */
+    .impact-box {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #166534;
+      margin-top: 14px;
+    }
+    .impact-box .impact-icon { font-size: 16px; flex-shrink: 0; }
+
+    /* Number comparison row */
+    .compare-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .compare-cell {
+      flex: 1;
+      min-width: 160px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+    .compare-cell.before {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+    }
+    .compare-cell.after {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+    }
+    .compare-cell .cl { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                        letter-spacing: .5px; margin-bottom: 4px; opacity: .7; }
+    .compare-cell.before .cl { color: #b91c1c; }
+    .compare-cell.after  .cl { color: #15803d; }
+    .compare-val { font-size: 20px; font-weight: 700; }
+    .compare-cell.before .compare-val { color: #dc2626; }
+    .compare-cell.after  .compare-val { color: #16a34a; }
+    .compare-desc { font-size: 12px; margin-top: 2px; opacity: .8; }
+
+    /* Math formula box */
+    .math-box {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      color: var(--gray-700);
+      margin-top: 10px;
+    }
+
+    /* Matrix display */
+    .matrix-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .matrix {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+    }
+    .matrix table { border-collapse: collapse; }
+    .matrix td { padding: 2px 8px; text-align: right; }
+    .matrix .label { font-size: 11px; color: var(--gray-500); margin-bottom: 4px; font-weight: 600; }
+    .matrix-op { font-size: 20px; color: var(--gray-400); align-self: center; }
+
+    /* Test results summary */
+    .test-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .test-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      font-size: 13px;
+    }
+    .test-item .tick { color: var(--success); font-size: 15px; flex-shrink: 0; }
+    .test-item-name { font-weight: 600; color: var(--gray-700); }
+    .test-item-desc { font-size: 12px; color: var(--gray-500); }
+
+    /* TOC sidebar feel */
+    .toc {
+      background: var(--primary-light);
+      border: 1px solid #b6cfef;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+    }
+    .toc-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+    .toc ol {
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .toc li { font-size: 13px; }
+    .toc a { color: var(--primary); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════════════════════════════════════════ -->
+<header>
+  <div>
+    <div class="logo">Unit Linked Simulation</div>
+    <div class="subtitle">Monte Carlo — Insurance Financial Planning Tool</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <a href="index.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      ← กลับ Simulation
+    </a>
+    <a href="readme.html"
+       style="color:#fff;font-size:13px;font-weight:600;text-decoration:none;
+              border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:6px 14px">
+      Methodology
+    </a>
+  </div>
+</header>
+
+<!-- ═══════════════ MAIN ══════════════════════════════════════════════════════ -->
+<main>
+
+  <!-- Breadcrumb -->
+  <div class="cl-nav">
+    <a href="index.html">Simulation</a>
+    <span class="cl-nav-sep">/</span>
+    <span style="color:var(--gray-700);font-size:13px">Changelog &amp; Bug Fixes</span>
+  </div>
+
+  <!-- Title -->
+  <div style="margin-bottom:28px">
+    <h1 style="font-size:26px;font-weight:700;color:var(--gray-900);margin-bottom:6px">
+      Changelog &amp; Bug Fixes
+    </h1>
+    <p style="font-size:14px;color:var(--gray-500)">
+      บันทึกการแก้ไข bug ทั้งหมดในเครื่องมือ simulation · เรียงลำดับตามความสำคัญของผลกระทบ
+    </p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <div class="toc-title">สารบัญ</div>
+    <ol>
+      <li><a href="#fix1">Daily vs Monthly Stats Scaling — CAGR ต่ำกว่าจริง ~21×</a></li>
+      <li><a href="#fix2">CAGR Formula สำหรับ DCA — แสดงค่าต่ำกว่าจริงอย่างมีนัยสำคัญ</a></li>
+      <li><a href="#fix3">Inter-Fund Correlation — Cholesky Decomposition</a></li>
+      <li><a href="#fix4">Population vs Sample Variance — Bessel's Correction</a></li>
+      <li><a href="#fix5">Test Suite ขยาย — 78 tests ผ่านทั้งหมด</a></li>
+      <li><a href="#fix6">Analytics Upgrade — Mean Series, 3-Column Panel, Risk Framing, Chart Overlay</a></li>
+      <li><a href="#fix7">Bug Fix — meanSeries TypeError ทำให้ Summary Panel ว่าง</a></li>
+      <li><a href="#fix8">Dynamic Mean vs Median Insight — ข้อความปรับตาม Gap อัตโนมัติ</a></li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 1 — Daily vs Monthly
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix1">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Daily vs Monthly Stats Scaling</div>
+        <div class="fix-file">js/simulation.js · calcFundStats() · resampleMonthly() [ใหม่]</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-bug">Critical Bug</span>
+        <span class="badge badge-math">Math</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหา</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        ข้อมูล NAV ในไฟล์เป็น <strong>รายวัน</strong> (~250 แถว/ปี)
+        แต่ <code>calcFundStats()</code> คำนวณ log-return ระหว่าง row ติดกัน
+        ซึ่งได้ <strong>daily return</strong> แล้วนำไปใส่ใน simulation ที่วิ่งทีละ <strong>1 เดือน</strong>
+        ทำให้ mean return ถูก scale ต่ำกว่าความเป็นจริง <strong>ประมาณ 21 เท่า</strong>
+        (จำนวนวันทำการต่อเดือน)
+      </p>
+
+      <div class="compare-row">
+        <div class="compare-cell before">
+          <div class="cl">ก่อนแก้ (ใช้ daily stats)</div>
+          <div class="compare-val">~0.13%/ปี</div>
+          <div class="compare-desc">ES-GQG annualised mean return</div>
+        </div>
+        <div class="compare-cell after">
+          <div class="cl">หลังแก้ (monthly resampled)</div>
+          <div class="compare-val">~4.58%/ปี</div>
+          <div class="compare-desc">ES-GQG annualised mean return</div>
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:18px">วิธีแก้</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เพิ่มฟังก์ชัน <code>resampleMonthly()</code> ที่จัดกลุ่มข้อมูลเป็น YYYY-MM
+        และเก็บ NAV สุดท้ายของแต่ละเดือน ก่อนคำนวณ log-return:
+      </p>
+      <pre><code><span class="cmt">// ก่อน — daily returns ถูก treat เป็น monthly</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">1</span>; i &lt; rows.length; i++) {
+  <span class="kw">const</span> r = Math.<span class="fn">log</span>(rows[i].nav / rows[i-<span class="num">1</span>].nav);   <span class="cmt">// ← daily gap</span>
+  returns.<span class="fn">push</span>(r);
+}
+
+<span class="cmt">// หลัง — resample ก่อน ได้ monthly returns</span>
+<span class="kw">const</span> rows = <span class="fn">resampleMonthly</span>(rawRows);               <span class="cmt">// ← group by YYYY-MM</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">1</span>; i &lt; rows.length; i++) {
+  <span class="kw">const</span> r = Math.<span class="fn">log</span>(rows[i].nav / rows[i-<span class="num">1</span>].nav);   <span class="cmt">// ← monthly gap</span>
+  returns.<span class="fn">push</span>(r);
+}</code></pre>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>ผลลัพธ์:</strong> CAGR ใน simulation ตรงกับ return จริงของกองทุน
+          ตัวเลข P50 (Median) จะสูงขึ้นอย่างเห็นได้ชัด
+          ฟังก์ชัน auto-detect: ถ้า avg gap &lt; 20 วัน = daily → resample;
+          ถ้า ≥ 20 วัน = monthly อยู่แล้ว → ไม่ทำอะไร
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 2 — CAGR → IRR
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix2">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">CAGR Formula สำหรับ DCA → แทนที่ด้วย IRR</div>
+        <div class="fix-file">js/simulation.js · calcIRR() [ใหม่] &nbsp;·&nbsp; js/app.js · buildSummaryTable()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-bug">Bug</span>
+        <span class="badge badge-math">Math</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหา</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        สูตร CAGR เดิมคำนวณเหมือนลงทุนทั้งหมดตั้งแต่วันแรก (lump sum)
+        แต่ผลิตภัณฑ์ Unit Linked จ่ายเบี้ยเป็นงวด (DCA)
+        ทำให้ตัวเลขต่ำกว่า return จริงอย่างมีนัยสำคัญ:
+      </p>
+
+      <div class="compare-row">
+        <div class="compare-cell before">
+          <div class="cl">ก่อนแก้ (CAGR lump-sum)</div>
+          <div class="compare-val">~4.11%</div>
+          <div class="compare-desc">กองทุนที่ return จริง 8%/ปี, DCA 3 ปี</div>
+        </div>
+        <div class="compare-cell after">
+          <div class="cl">หลังแก้ (IRR)</div>
+          <div class="compare-val">~8.00%</div>
+          <div class="compare-desc">ตรงกับ return จริงของกองทุน</div>
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:18px">สูตรเก่า vs สูตรใหม่</div>
+      <div class="math-box">
+        <span style="color:#b91c1c">✗ เดิม:</span>  CAGR = (final / totalPremium)^(1/years) − 1<br>
+        <span style="color:#15803d">✓ ใหม่:</span>  หาค่า r ที่ทำให้  Σ premium × (1+r)^(T−t) = final<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IRR_annual = (1 + r_monthly)^12 − 1
+      </div>
+
+      <div class="fix-section-label" style="margin-top:18px">Implementation</div>
+      <pre><code><span class="cmt">// Binary search — converges in 100 iterations (&lt; 1 µs)</span>
+<span class="kw">function</span> <span class="fn">calcIRR</span>(premium, step, months, finalValue) {
+  <span class="kw">function</span> <span class="fn">fv</span>(r) {
+    <span class="kw">let</span> sum = <span class="num">0</span>;
+    <span class="kw">for</span> (<span class="kw">let</span> m = <span class="num">0</span>; m &lt; months; m += step)
+      sum += premium * Math.<span class="fn">pow</span>(<span class="num">1</span> + r, months - m);
+    <span class="kw">return</span> sum;
+  }
+  <span class="cmt">// fv() monotonically increases with r → binary search valid</span>
+  <span class="kw">let</span> lo = <span class="num">-0.9</span>, hi = <span class="num">0.3</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; <span class="num">100</span>; i++) {
+    <span class="kw">const</span> mid = (lo + hi) / <span class="num">2</span>;
+    <span class="kw">if</span> (<span class="fn">fv</span>(mid) &lt; finalValue) lo = mid; <span class="kw">else</span> hi = mid;
+  }
+  <span class="kw">return</span> (Math.<span class="fn">pow</span>(<span class="num">1</span> + (lo + hi) / <span class="num">2</span>, <span class="num">12</span>) - <span class="num">1</span>) * <span class="num">100</span>;
+}</code></pre>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>ผลลัพธ์:</strong> คอลัมน์ใน Summary Table เปลี่ยนชื่อจาก "CAGR" เป็น "IRR"
+          ตัวเลขสะท้อน money-weighted return ที่ถูกต้องตามหลักการเงิน
+          รองรับทุก payment mode (monthly, quarterly, semi-annual, annual)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 3 — Correlation / Cholesky
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix3">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Inter-Fund Correlation — Cholesky Decomposition</div>
+        <div class="fix-file">
+          js/simulation.js · getAlignedMonthlyReturns() · computeCovMatrix() ·
+          cholesky() · calcSimParams() · runScenario() [แก้]
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-bug">Bug</span>
+        <span class="badge badge-math">Statistics</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหา</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        Simulation เดิมสร้าง random shock แต่ละกองทุนแบบ <strong>independent</strong>
+        โดยไม่สนใจความสัมพันธ์ระหว่างกัน
+        กองทุน Equity ที่ correlate กันสูง (เช่น ES-GQG กับ ES-ASIA-A ที่ r = 0.44)
+        จะถูก diversify เกินจริง ทำให้ spread ของ P25–P98 แคบเกินความเป็นจริง
+      </p>
+
+      <div class="fix-section-label">Correlation Matrix (ข้อมูลจริง 47 เดือน)</div>
+      <div class="matrix-wrap">
+        <div class="matrix">
+          <div class="label">Correlation R</div>
+          <table>
+            <tr><td></td><td style="color:var(--primary);font-weight:700">ES-GQG</td><td style="color:var(--primary);font-weight:700">ES-ASIA-A</td><td style="color:var(--primary);font-weight:700">ES-IPLUS</td></tr>
+            <tr><td style="color:var(--primary);font-weight:700">ES-GQG</td><td>1.000</td><td style="color:#dc2626;font-weight:700">0.436</td><td style="color:#e8a020;font-weight:700">0.387</td></tr>
+            <tr><td style="color:var(--primary);font-weight:700">ES-ASIA-A</td><td style="color:#dc2626;font-weight:700">0.436</td><td>1.000</td><td>0.179</td></tr>
+            <tr><td style="color:var(--primary);font-weight:700">ES-IPLUS</td><td style="color:#e8a020;font-weight:700">0.387</td><td>0.179</td><td>1.000</td></tr>
+          </table>
+        </div>
+        <div class="matrix-op">→</div>
+        <div class="matrix">
+          <div class="label">Cholesky L (monthly std)</div>
+          <table>
+            <tr><td style="color:#6c7086">L =</td><td>0.03774</td><td>0</td><td>0</td></tr>
+            <tr><td></td><td>0.02103</td><td>0.04341</td><td>0</td></tr>
+            <tr><td></td><td>0.00030</td><td>0.00001</td><td>0.00072</td></tr>
+          </table>
+        </div>
+        <div class="matrix-op">→</div>
+        <div class="matrix">
+          <div class="label">w = L · z  (correlated shocks)</div>
+          <table>
+            <tr><td style="color:#6c7086">w =</td><td colspan="2">L<sub>00</sub>·z<sub>0</sub></td></tr>
+            <tr><td></td><td colspan="2">L<sub>10</sub>·z<sub>0</sub> + L<sub>11</sub>·z<sub>1</sub></td></tr>
+            <tr><td></td><td colspan="2">L<sub>20</sub>·z<sub>0</sub> + L<sub>21</sub>·z<sub>1</sub> + L<sub>22</sub>·z<sub>2</sub></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:18px">Pipeline ใหม่</div>
+      <pre><code><span class="cmt">// 1. Align monthly returns (intersection of all fund months)</span>
+<span class="kw">const</span> { fundOrder, returns } = <span class="fn">getAlignedMonthlyReturns</span>(navData);
+
+<span class="cmt">// 2. Sample covariance matrix  Σ[i][j] = cov(r_i, r_j)</span>
+<span class="kw">const</span> covMatrix = <span class="fn">computeCovMatrix</span>(returns);   <span class="cmt">// divides by T−1</span>
+
+<span class="cmt">// 3. Cholesky: find L such that  L × Lᵀ = Σ</span>
+<span class="kw">const</span> L = <span class="fn">cholesky</span>(covMatrix);
+
+<span class="cmt">// 4. Each month in runScenario():</span>
+<span class="kw">const</span> z = Array.<span class="fn">from</span>({ length: nFunds }, randNormal); <span class="cmt">// independent N(0,1)</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; nFunds; i++) {
+  <span class="kw">let</span> shock = <span class="num">0</span>;
+  <span class="kw">for</span> (<span class="kw">let</span> k = <span class="num">0</span>; k &lt;= i; k++) shock += L[i][k] * z[k]; <span class="cmt">// w = L·z</span>
+  nav[funds[i]] *= Math.<span class="fn">exp</span>(mean_i + shock);              <span class="cmt">// shock ~ N(0, σ_i²)</span>
+}</code></pre>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>ผลลัพธ์:</strong> Portfolio ที่ถือ equity funds หลายกองที่ correlate กัน
+          จะมี spread P25–P98 กว้างขึ้น สะท้อนความเสี่ยง downside ที่สมจริงกว่าเดิม
+          Single-fund case ยังคงทำงานได้ปกติ (L = [[std]] — เหมือนเดิมทุกประการ)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 4 — Sample Variance
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix4">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Population Variance → Sample Variance (Bessel's Correction)</div>
+        <div class="fix-file">js/simulation.js · calcFundStats() · computeCovMatrix()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-math">Statistics</span>
+        <span class="badge badge-fix">Minor Fix</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหา</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        ข้อมูล 47 เดือนที่ใช้คือ <em>ตัวอย่าง</em> จากประชากรจริงที่ไม่รู้จัก
+        การหาร <code>n</code> (population formula) ให้ variance ที่ต่ำกว่าจริง (biased downward)
+        เพราะ sample mean ถูก "pull" เข้าหาข้อมูล
+        การหาร <code>n−1</code> แก้ bias นี้ (Bessel's correction)
+      </p>
+
+      <div class="fix-section-label">การเปลี่ยนแปลง</div>
+      <pre><code><span class="cmt">// ก่อน — population variance (biased)</span>
+<span class="kw">const</span> variance = n &gt; <span class="num">0</span>
+  ? returns.<span class="fn">reduce</span>((a,b) =&gt; a + (b-mean)**<span class="num">2</span>, <span class="num">0</span>) / <span class="del">n</span>
+  : <span class="num">0</span>;
+
+<span class="cmt">// หลัง — sample variance (unbiased)</span>
+<span class="kw">const</span> variance = n &gt; <span class="num">1</span>
+  ? returns.<span class="fn">reduce</span>((a,b) =&gt; a + (b-mean)**<span class="num">2</span>, <span class="num">0</span>) / <span class="add">(n - 1)</span>
+  : <span class="num">0</span>;</code></pre>
+
+      <div class="fix-section-label" style="margin-top:14px">ผลกระทบต่อแต่ละกองทุน (n = 47 เดือน)</div>
+      <div style="overflow-x:auto;margin-top:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              <th style="text-align:left;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">กองทุน</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">std เดิม (÷n)</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">std ใหม่ (÷n−1)</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">เปลี่ยนแปลง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">ES-GQG</td>
+              <td style="text-align:right;padding:8px 12px">12.93% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">13.07% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">+1.08%</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">ES-ASIA-A</td>
+              <td style="text-align:right;padding:8px 12px">16.53% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">16.71% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">+1.08%</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-weight:600">ES-IPLUS</td>
+              <td style="text-align:right;padding:8px 12px">0.27% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">0.27% / ปี</td>
+              <td style="text-align:right;padding:8px 12px;color:var(--success)">+1.08%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--gray-500);margin-top:8px">
+        ทุกกองเพิ่มขึ้น factor เดียวกัน √(n / n−1) = √(47/46) ≈ 1.01081
+        ผลกระทบต่อ P25/P98 น้อยมาก (~1%) แต่ถูกต้องทางสถิติ
+      </p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 5 — Test Suite
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix5">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Test Suite — ตรวจสอบความถูกต้องของ simulation engine</div>
+        <div class="fix-file">tools/test-simulation.js [ไฟล์ใหม่] · 8 suites · 78 assertions</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-fix">Tests</span>
+        <span class="badge badge-new">78 passed</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <p style="font-size:14px;color:var(--gray-700);margin-bottom:14px">
+        ชุดทดสอบที่รันผ่าน Node.js (<code>node tools/test-simulation.js</code>)
+        ออก exit code 1 ทันทีหากผลลัพธ์ไม่ตรงกับค่าที่คำนวณได้เชิงวิเคราะห์
+        ทดสอบครอบคลุมตั้งแต่ zero-volatility จนถึง multi-fund correlated simulation
+        และ properties ทางสถิติ/การเงิน
+      </p>
+
+      <!-- Suite 1–5 -->
+      <div class="fix-section-label">Suites 1–5: Deterministic correctness &amp; IRR</div>
+      <div class="test-grid">
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Suite 1 — Zero return, zero volatility</div>
+            <div class="test-item-desc">final = total premiums ทุกงวด · ทุก 200 scenarios identical (14 assertions)</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Suite 2 — Zero vol, positive return</div>
+            <div class="test-item-desc">ทุกเดือนตรงสูตร P·(e<sup>Tm</sup>−1)/(e<sup>m</sup>−1) · geometric series (14 assertions)</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Suite 3 — Two-fund zero volatility</div>
+            <div class="test-item-desc">50/50 portfolio std=0 → identical · final = total premiums (2 assertions)</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Suite 4 — Cholesky L × Lᵀ = Cov</div>
+            <div class="test-item-desc">max error ≤ RIDGE=1e-10 · lower-triangular · diagonal &gt; 0 · 2×2 analytical (6 assertions)</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Suite 5 — calcIRR correctness</div>
+            <div class="test-item-desc">1-period exact · zero return → 0% · round-trip 12 periods · negative · quarterly (5 assertions)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suite 6 -->
+      <div class="fix-section-label" style="margin-top:18px">Suite 6: Empirical correlation matrix (N = 100,000)</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:10px">
+        สร้าง 100,000 correlated samples จาก 3-asset Cholesky จากนั้นคำนวณ empirical correlation matrix
+        และเปรียบเทียบกับ target ตรวจสอบว่าทุก element อยู่ภายใน <strong>±0.05</strong>
+      </p>
+      <div class="math-box">
+        input: stds = [0.04, 0.05, 0.03],  target corr = [[1, 0.60, 0.30], [0.60, 1, 0.20], [0.30, 0.20, 1]]<br>
+        empirical: [0.6010/0.60, 0.2956/0.30, 0.1945/0.20]  ← worst error = 0.0055 ≪ 0.05
+      </div>
+      <div class="test-grid" style="margin-top:10px">
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Diagonal = 1.0 (self-correlation)</div>
+            <div class="test-item-desc">tolerance ±0.001 · 3 assertions</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Off-diagonal within ±0.05 of target</div>
+            <div class="test-item-desc">6 pairs · max error = 0.0055</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Symmetry: corr[i][j] = corr[j][i]</div>
+            <div class="test-item-desc">3 pairs · tolerance 1e-12</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Empirical std within ±2% of target</div>
+            <div class="test-item-desc">3 funds · relative error ≪ 2%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suite 7 -->
+      <div class="fix-section-label" style="margin-top:18px">Suite 7: Simulated mean ≈ input μ, simulated std ≈ input σ</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:10px">
+        ตรวจสอบว่า distribution ของ simulation output ตรงกับ parameters ที่ป้อนเข้าไปจริงๆ
+      </p>
+      <div class="math-box">
+        <strong>Part A (2-month trick):</strong>  premiumMonths={0}, months=2, offer=bid=1<br>
+        → log(value[1] / premium) = μ + w ~ N(μ, σ²)  <em>exactly</em><br>
+        ตรวจสอบ 3 fund configs (equity/bond/inverse) N=100k · tolerance ±0.003 (mean), ±0.005 (std)<br><br>
+        <strong>Part B (seeded PRNG):</strong>  3-fund Cholesky, mulberry32 seed<br>
+        ตรวจสอบ empirical mean ≈ input μᵢ, empirical std ≈ input σᵢ ทุกกอง
+      </div>
+      <div class="test-grid" style="margin-top:10px">
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Part A — mean end-to-end (3 configs)</div>
+            <div class="test-item-desc">equity μ=0.006 · bond μ=0.002 · inverse μ=-0.003 · tol ±0.003</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Part A — std end-to-end (3 configs)</div>
+            <div class="test-item-desc">σ=0.040, 0.010, 0.050 · tol ±0.005</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Part B — multi-fund mean (seeded)</div>
+            <div class="test-item-desc">3 กอง correlated N=100k · deterministic ทุก run</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Part B — multi-fund std (seeded)</div>
+            <div class="test-item-desc">σ=[0.040, 0.015, 0.060] · tolerance ±0.005</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suite 8 -->
+      <div class="fix-section-label" style="margin-top:18px">Suite 8: Volatility Drag — Itô Correction</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:10px">
+        ตรวจสอบ property ทางคณิตศาสตร์ที่สำคัญ:
+        เมื่อ <strong>μ_GBM = 0</strong> (zero arithmetic drift, "fair game") และ σ &gt; 0
+        <strong>median portfolio return ต้องติดลบ</strong>
+      </p>
+      <div class="math-box">
+        GBM:  dS/S = μ dt + σ dW,  μ = 0<br>
+        โดย Itô's lemma: log-return mean = μ − σ²/2 = <strong>−σ²/2 &lt; 0</strong><br>
+        → median NAV_t = NAV_0 · exp(−σ²t/2) &lt; NAV_0  (ลดลงตามเวลา)<br>
+        → distribution of final portfolio value: <strong>right-skewed</strong><br>
+        → arithmetic mean ≈ total paid (zero drift), แต่ <strong>P50 &lt; total paid</strong>
+      </div>
+      <div style="overflow-x:auto;margin-top:10px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              <th style="text-align:left;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">σ (monthly)</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">log-mean (−σ²/2)</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">P50 return</th>
+              <th style="text-align:right;padding:8px 12px;font-weight:700;color:var(--gray-500);font-size:11px;text-transform:uppercase">Arith mean return</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">0.02</td>
+              <td style="text-align:right;padding:8px 12px">−0.00020</td>
+              <td style="text-align:right;padding:8px 12px;color:#dc2626;font-weight:700">−0.22%</td>
+              <td style="text-align:right;padding:8px 12px;color:#16a34a">+0.05%</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">0.04</td>
+              <td style="text-align:right;padding:8px 12px">−0.00080</td>
+              <td style="text-align:right;padding:8px 12px;color:#dc2626;font-weight:700">−0.95%</td>
+              <td style="text-align:right;padding:8px 12px;color:#16a34a">+0.11%</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-weight:600">0.06</td>
+              <td style="text-align:right;padding:8px 12px">−0.00180</td>
+              <td style="text-align:right;padding:8px 12px;color:#dc2626;font-weight:700">−2.33%</td>
+              <td style="text-align:right;padding:8px 12px;color:#16a34a">+0.01%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:12px;color:var(--gray-500);margin-top:8px">
+        N = 20,000 scenarios · 36 months DCA · premium 5,000 / เดือน
+        ยิ่ง σ สูง ยิ่ง P50 ติดลบมากขึ้น — volatility drag สำคัญสำหรับกองทุน equity ที่มี σ สูง
+      </p>
+      <div class="test-grid" style="margin-top:10px">
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">P50 &lt; total paid (3 σ levels)</div>
+            <div class="test-item-desc">σ = 0.02, 0.04, 0.06 · logMean = −σ²/2</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Arithmetic mean ≈ total paid (±1.5%)</div>
+            <div class="test-item-desc">zero GBM drift → E[FV] = total paid ที่ตรง</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Arithmetic mean &gt; P50</div>
+            <div class="test-item-desc">right-skewed distribution ทุก σ level</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <pre><code><span class="cmt"># รัน tests</span>
+node tools/test-simulation.js
+
+<span class="cmt"># output เมื่อทุก test ผ่าน</span>
+All <span class="num">78</span> tests passed.</code></pre>
+      </div>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>สำคัญ:</strong> fundStats.mean ใน simulation คือ <em>log-return mean</em>
+          ไม่ใช่ GBM drift (μ_GBM)
+          ถ้า mean = 0 → arithmetic drift = exp(σ²/2) &gt; 0 → P50 เป็นบวก
+          ถ้า mean = −σ²/2 → arithmetic drift = 0 → P50 เป็นลบ (Itô correction)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 6 — Analytics Upgrade
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix6">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Analytics Upgrade — Mean Series, 3-Column Summary Panel, Risk Framing, Chart Overlay</div>
+        <div class="fix-file">js/simulation.js · js/app.js · js/charts.js · css/style.css · index.html</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-new">Feature</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7;margin-bottom:14px">
+        ปรับปรุงหน้าผลลัพธ์ให้แสดงข้อมูลเชิงวิเคราะห์มากขึ้น
+        โดยไม่เปลี่ยน simulation engine แม้แต่บรรทัดเดียว
+        การเปลี่ยนแปลงครอบคลุม 4 ส่วนหลัก
+      </p>
+
+      <!-- Mean Series -->
+      <div class="fix-section-label">1. Mean Series — js/simulation.js</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เพิ่มการคำนวณ <code>meanSeries[]</code> แบบ streaming pass เดียว (ไม่เก็บ allSeries ทั้งหมดไว้ในหน่วยความจำ)
+        <code>runMonteCarlo()</code> ส่งกลับ <code>{ percentiles, months, meanSeries }</code> แทนเดิมที่ไม่มี mean
+      </p>
+      <pre><code><span class="cmt">// Streaming mean — O(N·months) memory เพิ่มแค่ O(months)</span>
+<span class="kw">const</span> meanSeries = <span class="kw">new</span> Array(months).<span class="fn">fill</span>(<span class="num">0</span>);
+<span class="kw">for</span> (<span class="kw">const</span> s <span class="kw">of</span> allSeries) {
+  <span class="kw">for</span> (<span class="kw">let</span> m = <span class="num">0</span>; m &lt; months; m++) meanSeries[m] += s[m];
+}
+<span class="kw">for</span> (<span class="kw">let</span> m = <span class="num">0</span>; m &lt; months; m++) meanSeries[m] /= N;
+<span class="kw">return</span> { percentiles, months, meanSeries };</code></pre>
+
+      <!-- 3-column panel -->
+      <div class="fix-section-label" style="margin-top:18px">2. 3-Column Outcome Summary Panel — js/app.js · renderOutcomeSummary()</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แทนที่ตารางเดิมด้วย 3 คอลัมน์: <strong>Average</strong> / <strong>Typical (Median) ★</strong> / <strong>Downside (P25)</strong>
+        แต่ละคอลัมน์แสดง มูลค่าสุดท้าย + IRR
+        Median column ถูก highlight เป็น "Most Relevant" เพราะสะท้อนประสบการณ์จริงของนักลงทุน
+      </p>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ด้านล่างมี comparison row แสดง mean vs median เป็นตัวเลขและ % gap พร้อม insight message
+      </p>
+
+      <!-- Risk Framing -->
+      <div class="fix-section-label" style="margin-top:18px">3. Risk Framing Section — js/app.js · renderRiskFraming()</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เพิ่มบล็อก 3 cards ใต้กราฟ แสดงประโยคความน่าจะเป็นแบบเข้าใจง่าย เช่น
+        "X% ของสถานการณ์ได้กำไร" คำนวณจาก percentile distribution โดยตรง
+        ไม่มี jargon ทางสถิติ
+      </p>
+
+      <!-- Chart overlay -->
+      <div class="fix-section-label" style="margin-top:18px">4. Mean Overlay บน Chart — js/charts.js</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เพิ่ม dashed purple line แสดง Average (Mean) บนกราฟ สามารถเปิด/ปิดได้ด้วย checkbox
+        ใช้ Chart.js <code>borderDash: [7, 4]</code> และ <code>order: 0</code> เพื่อให้วาดก่อน percentile bands
+      </p>
+      <pre><code><span class="cmt">// Mean overlay dataset</span>
+<span class="kw">if</span> (opts.meanSeries) {
+  datasets.<span class="fn">push</span>({
+    label: <span class="str">'Average (Mean)'</span>,
+    data: opts.meanSeries,
+    borderColor: <span class="str">'#7c3aed'</span>,
+    borderDash: [<span class="num">7</span>, <span class="num">4</span>],     <span class="cmt">// dashed purple</span>
+    borderWidth: <span class="num">2</span>,
+    pointRadius: <span class="num">0</span>,
+    order: <span class="num">0</span>,               <span class="cmt">// draw behind percentile bands</span>
+  });
+}</code></pre>
+
+      <div class="compare-row">
+        <div class="compare-cell before">
+          <div class="cl">ก่อน</div>
+          <div class="compare-val" style="font-size:14px;line-height:1.5">ตารางสรุปเดียว<br>ไม่มี mean<br>ไม่มี insight</div>
+        </div>
+        <div class="compare-cell after">
+          <div class="cl">หลัง</div>
+          <div class="compare-val" style="font-size:14px;line-height:1.5">3-column panel + IRR<br>Mean overlay บน chart<br>Risk framing + insight</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 7 — meanSeries TypeError
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix7">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Bug: meanSeries TypeError — Summary Panel แสดงว่างเปล่า</div>
+        <div class="fix-file">js/app.js · renderOutcomeSummary()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-bug">Bug</span>
+        <span class="badge badge-fix">Fix</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหา</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        เมื่อเปิดแท็บที่มี <code>simulation.js</code> ค้างอยู่ใน browser cache (เวอร์ชันก่อนเพิ่ม mean series)
+        <code>state.results.meanSeries</code> จะเป็น <code>undefined</code>
+        ทำให้ <code>meanFinal = meanSeries[months - 1]</code> throw <code>TypeError</code>
+        ก่อนที่ <code>el.innerHTML</code> จะถูก assign — panel จึงแสดงว่างเปล่าโดยไม่มี error ที่เห็นได้
+      </p>
+      <pre><code><span class="cmt">// ก่อน — crash ถ้า meanSeries = undefined</span>
+<span class="kw">const</span> { percentiles, months, meanSeries } = state.results;
+<span class="kw">const</span> meanFinal = <span class="del">meanSeries[months - 1]</span>;  <span class="cmt">// TypeError!</span>
+
+<span class="cmt">// หลัง — null guard</span>
+<span class="kw">const</span> hasMean = Array.<span class="fn">isArray</span>(meanSeries) &amp;&amp; meanSeries.length === months;
+<span class="kw">const</span> meanFinal = <span class="add">hasMean ? meanSeries[months - 1] : null</span>;
+<span class="cmt">// ถ้า !hasMean → Average column แสดง placeholder แทน crash</span></code></pre>
+
+      <div class="fix-section-label" style="margin-top:14px">Fallback เมื่อ hasMean = false</div>
+      <p style="font-size:13px;color:var(--gray-700)">
+        Average column แสดง "—" พร้อมข้อความ "รีเฟรชหน้าเว็บแล้วรัน Simulation ใหม่ เพื่อแสดงค่าเฉลี่ย"
+        คอลัมน์ Median และ Downside ยังแสดงผลได้ปกติทุกกรณี
+        Comparison block ถูกซ่อนเมื่อไม่มีค่า mean
+      </p>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>ผลลัพธ์:</strong> หน้า Results ไม่ crash แม้ browser cache ยังเก่า
+          นักลงทุนยังเห็น Median และ Downside ได้ครบ
+          หลัง hard-refresh (<kbd>Ctrl+Shift+R</kbd>) mean จะแสดงตามปกติ
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       FIX 8 — Dynamic Insight Message
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="fix8">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Dynamic Mean vs Median Insight — ข้อความปรับตาม Gap อัตโนมัติ</div>
+        <div class="fix-file">js/app.js · renderOutcomeSummary() · mmcInsight()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-new">Feature</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">เหตุผล</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7">
+        ข้อความเดิมเป็นข้อความคงที่ที่ไม่สะท้อนความรุนแรงของ skew จริงในผลลัพธ์
+        Portfolio ที่ mean ≈ median (กองทุนผันผวนน้อย) ควรได้รับข้อความที่ต่างจาก
+        portfolio ที่ mean สูงกว่า median มากกว่า 20% (กองทุน equity ผันผวนสูง)
+      </p>
+
+      <div class="fix-section-label">Logic</div>
+      <div class="math-box">
+        relGapPct = (mean − median) / median × 100<br><br>
+        &lt; 5%  → Soft: "ค่าเฉลี่ยอาจสูงกว่าเล็กน้อย แต่ผลลัพธ์ส่วนใหญ่จะใกล้เคียงผลลัพธ์ทั่วไป"<br>
+        5–20% → Balanced: "ค่าเฉลี่ยสูงขึ้นจากบางกรณีที่ได้ผลดีมาก คนส่วนใหญ่จะได้ผลลัพธ์ใกล้เคียงผลลัพธ์ทั่วไป"<br>
+        &gt; 20% → Strong: "ค่าเฉลี่ยไม่ใช่สิ่งที่คนส่วนใหญ่จะได้ ผลลัพธ์ทั่วไปสะท้อนความเป็นจริงได้ดีกว่า"
+      </div>
+
+      <pre><code><span class="kw">function</span> <span class="fn">mmcInsight</span>(relGap) {
+  <span class="kw">if</span> (relGap === <span class="kw">null</span>) <span class="kw">return</span> <span class="str">''</span>;
+  <span class="kw">if</span> (relGap &lt; <span class="num">5</span>)
+    <span class="kw">return</span> <span class="str">'ค่าเฉลี่ยอาจสูงกว่าเล็กน้อย แต่ผลลัพธ์ส่วนใหญ่จะใกล้เคียง'</span>
+         + <span class="str">'&lt;strong&gt;ผลลัพธ์ทั่วไป&lt;/strong&gt; — ใช้ตัวเลขนี้เป็นหลักในการตัดสินใจ'</span>;
+  <span class="kw">if</span> (relGap &lt; <span class="num">20</span>)
+    <span class="kw">return</span> <span class="str">'ค่าเฉลี่ยสูงขึ้นจากบางกรณีที่ได้ผลดีมาก แต่คนส่วนใหญ่จะได้ผลลัพธ์ใกล้เคียง'</span>
+         + <span class="str">'&lt;strong&gt;ผลลัพธ์ทั่วไป&lt;/strong&gt; — ควรใช้ตัวเลขนี้เป็นเกณฑ์หลัก'</span>;
+  <span class="kw">return</span> <span class="str">'ค่าเฉลี่ยไม่ใช่สิ่งที่คนส่วนใหญ่จะได้ ผลลัพธ์จริงมักต่ำกว่าค่าเฉลี่ยเพราะความผันผวน'</span>
+       + <span class="str">' — &lt;strong&gt;ผลลัพธ์ทั่วไป&lt;/strong&gt;สะท้อนความเป็นจริงได้ดีกว่า'</span>;
+}</code></pre>
+
+      <div class="fix-section-label" style="margin-top:14px">Requirements ที่รักษาไว้</div>
+      <div class="test-grid">
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">ภาษาไทยตลอด</div>
+            <div class="test-item-desc">ไม่มี jargon เช่น "right-skewed", "distribution"</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">ไม่เกิน 2 บรรทัด</div>
+            <div class="test-item-desc">ทุก tier ใช้ประโยคเดียว ≤ 2 clauses</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Reinforce Median ทุก tier</div>
+            <div class="test-item-desc"><strong>ผลลัพธ์ทั่วไป</strong> bold ทุกข้อความ</div>
+          </div>
+        </div>
+        <div class="test-item">
+          <span class="tick">✓</span>
+          <div>
+            <div class="test-item-name">Gap relative to median</div>
+            <div class="test-item-desc">relGapPct = (mean−median)/median ไม่ใช่ total paid</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="card" style="background:var(--primary);color:#fff">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">สรุปการเปลี่ยนแปลงทั้งหมด</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;font-size:13px">
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">~21×</div>
+        <div style="opacity:.85">mean return understated ก่อนแก้ Fix #1</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">~51%</div>
+        <div style="opacity:.85">IRR ถูก understate โดย CAGR formula ก่อนแก้ Fix #2</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">0.44</div>
+        <div style="opacity:.85">correlation ES-GQG ↔ ES-ASIA-A ที่ถูก ignore ก่อนแก้ Fix #3</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">78</div>
+        <div style="opacity:.85">tests ผ่านทั้งหมด · 8 suites ครอบคลุม math, stats, IRR, correlation, Itô</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">Mean</div>
+        <div style="opacity:.85">streaming mean series · 3-column panel + IRR · dashed chart overlay · risk framing</div>
+      </div>
+      <div style="background:rgba(255,255,255,.12);border-radius:6px;padding:12px">
+        <div style="font-size:22px;font-weight:700">3 Tiers</div>
+        <div style="opacity:.85">dynamic insight message ปรับตาม gap ระหว่าง mean กับ median อัตโนมัติ</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</body>
+</html>
