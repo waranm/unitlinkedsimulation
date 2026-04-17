@@ -593,6 +593,41 @@ async function runSimulation() {
     navData: state.navData, allocation: state.allocation,
     premium: state.premium, paymentMode: state.paymentMode,
     months: state.selectedPeriod, N: state.N, feeParams: {},
+    regimeSwitching: true,
+    regimes: [
+      {
+        name: 'Bull',
+        defaultScale: { muScale: 1.0, sigmaScale: 1.0 },
+        fundScales: {
+          'กองทุนเปิดอีสท์สปริง Asia Active Equity (ชนิดสะสมมูลค่า) (ES-ASIA-A)': { muScale:  1.5, sigmaScale: 0.7 },
+          'กองทุนเปิดอีสท์สปริง Global Quality Growth (ES-GQG)':                  { muScale:  1.3, sigmaScale: 0.8 },
+          'กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)':                          { muOverride:  0.001, sigmaScale: 0.8 },
+        },
+      },
+      {
+        name: 'Bear',
+        defaultScale: { muScale: -0.5, sigmaScale: 1.5 },
+        fundScales: {
+          'กองทุนเปิดอีสท์สปริง Asia Active Equity (ชนิดสะสมมูลค่า) (ES-ASIA-A)': { muScale: -0.5, sigmaScale: 1.8 },
+          'กองทุนเปิดอีสท์สปริง Global Quality Growth (ES-GQG)':                  { muScale: -0.3, sigmaScale: 1.5 },
+          'กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)':                          { muOverride:  0.004, sigmaScale: 1.2 },
+        },
+      },
+      {
+        name: 'Crisis',
+        defaultScale: { muScale: -2.0, sigmaScale: 2.5 },
+        fundScales: {
+          'กองทุนเปิดอีสท์สปริง Asia Active Equity (ชนิดสะสมมูลค่า) (ES-ASIA-A)': { muScale: -3.0, sigmaScale: 3.0 },
+          'กองทุนเปิดอีสท์สปริง Global Quality Growth (ES-GQG)':                  { muScale: -2.0, sigmaScale: 2.5 },
+          'กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)':                          { muOverride:  0.008, sigmaScale: 1.8 },
+        },
+      },
+    ],
+    transitionMatrix: [
+      [0.90, 0.09, 0.01],
+      [0.15, 0.75, 0.10],
+      [0.25, 0.45, 0.30],
+    ],
   };
 
   try {
