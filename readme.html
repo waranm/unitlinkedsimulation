@@ -648,6 +648,27 @@
           ระบุ fundScales ใน config เพียงอย่างเดียว
         </div>
       </div>
+
+      <div class="fix-section-label" style="margin-top:16px">จุดที่ต้องแก้ไฟล์ — Quick Reference</div>
+      <div class="math-box">
+        <strong>เปิด/ปิด Regime Switching</strong><br>
+        &nbsp;&nbsp;ไฟล์: <code>js/app.js</code> บรรทัด ~596<br>
+        &nbsp;&nbsp;<code>regimeSwitching: true</code> &nbsp;← เปิด (ค่าปัจจุบัน)<br>
+        &nbsp;&nbsp;<code>regimeSwitching: false</code> &nbsp;← ปิด ใช้ GBM ปกติ<br><br>
+        <strong>แก้ค่า muScale / muOverride / sigmaScale ต่อกอง</strong><br>
+        &nbsp;&nbsp;ไฟล์: <code>js/app.js</code> บรรทัด ~597<br>
+        &nbsp;&nbsp;แก้ใน <code>fundScales</code> ของแต่ละ regime (Bull / Bear / Crisis)<br><br>
+        <strong>เพิ่มกองทุนใหม่</strong><br>
+        &nbsp;&nbsp;ไฟล์: <code>js/app.js</code><br>
+        &nbsp;&nbsp;เพิ่ม entry ใน <code>fundScales</code> ทั้ง 3 regime โดยใช้ชื่อกองทุน<br>
+        &nbsp;&nbsp;ตรงกับ <code>data/funds-index.json → name</code> เป๊ะๆ<br>
+        &nbsp;&nbsp;ถ้าไม่เพิ่ม → ใช้ <code>defaultScale</code> อัตโนมัติ<br><br>
+        <strong>แก้ Transition Matrix</strong><br>
+        &nbsp;&nbsp;ไฟล์: <code>js/app.js</code><br>
+        &nbsp;&nbsp;แก้ใน <code>transitionMatrix</code> — แต่ละแถวต้องรวมกัน = 1.0<br><br>
+        <strong>Logic ของ Simulation Engine</strong><br>
+        &nbsp;&nbsp;ไฟล์: <code>js/simulation.js</code> — ไม่ต้องแตะถ้าแค่ปรับค่า config
+      </div>
     </div>
   </div>
 
