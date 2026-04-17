@@ -308,11 +308,31 @@ function calcSimParams(navData) {
   return { fundStats, fundOrder, choleskyL: L };
 }
 
-/** Box-Muller transform → standard normal sample */
-function randNormal() {
+/**
+ * Mulberry32 — fast 32-bit seeded PRNG.
+ * Returns a function that produces a uniform float in [0, 1) from an integer seed.
+ * Each call advances the internal state, so one mulberry32(seed) instance is a
+ * self-contained reproducible random stream.
+ * @param {number} seed  32-bit integer seed
+ * @returns {function(): number}
+ */
+function mulberry32(seed) {
+  return function () {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Box-Muller transform → standard normal sample.
+ * @param {function(): number} rng  uniform [0,1) random source
+ */
+function randNormal(rng) {
   let u, v;
-  do { u = Math.random(); } while (u === 0);
-  do { v = Math.random(); } while (v === 0);
+  do { u = rng(); } while (u === 0);
+  do { v = rng(); } while (v === 0);
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
@@ -411,6 +431,7 @@ function rebalance(portfolio, navPrices, fundStats, allocation) {
  *   - rebalanceMode  'none' | 'monthly' | 'quarterly' | 'annual'
  *   - initialNav     { fundName: startingNAV }
  *   - feeParams      fee config (passed through to applyFees)
+ *   - rng            seeded PRNG function from mulberry32(); defaults to Math.random
  * @returns {number[]}  portfolio value (at BID) at end of each month
  */
 function runScenario(params) {
@@ -418,7 +439,8 @@ function runScenario(params) {
     fundStats, fundOrder, choleskyL,
     allocation, months,
     premiumMonths, premium,
-    rebalanceMode, initialNav, feeParams = {}
+    rebalanceMode, initialNav, feeParams = {},
+    rng = Math.random
   } = params;
 
   const funds = fundOrder;
@@ -441,7 +463,7 @@ function runScenario(params) {
     //    By construction:  Cov(w) = L · Lᵀ = Σ,  so w[i] ~ N(0, std_i²)
     //    with the historical inter-fund correlations embedded.
     //    The NAV update then uses  mean_i + w[i]  (no separate std scaling).
-    const z = Array.from({ length: nFunds }, randNormal);
+    const z = Array.from({ length: nFunds }, () => randNormal(rng));
     for (let i = 0; i < nFunds; i++) {
       let shock = 0;
       for (let k = 0; k <= i; k++) shock += choleskyL[i][k] * z[k];
@@ -515,7 +537,8 @@ function buildPremiumMonths(mode, totalMonths) {
 async function runMonteCarlo(config, onProgress) {
   const {
     navData, allocation, premium, paymentMode,
-    months, rebalanceMode, N, feeParams = {}
+    months, rebalanceMode, N, feeParams = {},
+    seed = Date.now()
   } = config;
 
   const { fundStats, fundOrder, choleskyL } = calcSimParams(navData);
@@ -538,11 +561,14 @@ async function runMonteCarlo(config, onProgress) {
 
   const BATCH = 100;
   for (let i = 0; i < N; i++) {
+    // Each scenario gets its own deterministic PRNG seeded by (mainSeed + index).
+    // Same seed → identical results; different index → independent streams.
+    const rng = mulberry32(seed + i);
     const series = runScenario({
       fundStats, fundOrder, choleskyL,
       allocation: allocFrac, months,
       premium, premiumMonths,
-      rebalanceMode, initialNav, feeParams
+      rebalanceMode, initialNav, feeParams, rng
     });
     allSeries.push(series);
 
