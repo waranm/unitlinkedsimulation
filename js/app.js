@@ -597,12 +597,14 @@ async function runSimulation() {
 
   try {
     if (state.compareRebalance) {
-      // Run 3 simulations sequentially; each gets 1/3 of the progress bar
+      // All modes share the same seed so Monte Carlo variance is eliminated
+      // from the comparison — any difference reflects rebalancing only.
+      const compareSeed = Date.now();
       const modes = ['none', 'monthly', 'quarterly', 'annual'];
       const compareResults = {};
       for (let i = 0; i < modes.length; i++) {
         compareResults[modes[i]] = await runMonteCarlo(
-          { ...baseConfig, rebalanceMode: modes[i] },
+          { ...baseConfig, rebalanceMode: modes[i], seed: compareSeed },
           pct => setProgress((i * 100 + pct) / modes.length)
         );
       }
