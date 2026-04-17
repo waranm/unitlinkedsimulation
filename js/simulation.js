@@ -398,21 +398,38 @@ function applyFees(portfolio, bidPrices, feeParams, month) {
 }
 
 // ─── Rebalance helper ─────────────────────────────────────────────────────────
-// Rebalancing sells at BID and buys at Offer.
-// Net effect: total value stays the same; units are redistributed.
-// We approximate by computing total at BID and re-buying at Offer.
+// Spread cost applies only to the DELTA (amount actually traded), not the
+// whole portfolio.  Overweight funds sell the excess at BID; underweight
+// funds buy the deficit at Offer.  A fund already at its target weight
+// is untouched — so a single-fund portfolio incurs zero spread cost.
 
 function rebalance(portfolio, navPrices, fundStats, allocation) {
-  // Value at BID prices
+  // Current value of each fund at BID
+  const bidValues = {};
   let total = 0;
   for (const [fund, units] of Object.entries(portfolio)) {
     const bid = navPrices[fund] * (fundStats[fund]?.bidRatio ?? 1);
-    total += units * bid;
+    bidValues[fund] = units * bid;
+    total += bidValues[fund];
   }
-  // Re-allocate: buy at Offer prices
+  if (total === 0) return;
+
+  // Trade only the delta per fund
   for (const [fund, pct] of Object.entries(allocation)) {
-    const offer = navPrices[fund] * (fundStats[fund]?.offerRatio ?? 1);
-    portfolio[fund] = (total * pct) / offer;
+    const targetValue  = total * pct;
+    const currentValue = bidValues[fund] ?? 0;
+    const delta = targetValue - currentValue; // + = buy, - = sell
+    if (Math.abs(delta) < 1e-9) continue;    // already at target — no trade
+
+    if (delta < 0) {
+      // Selling excess — reduce units at BID price
+      const bidPrice = navPrices[fund] * (fundStats[fund]?.bidRatio ?? 1);
+      portfolio[fund] += delta / bidPrice;
+    } else {
+      // Buying deficit — add units at Offer price
+      const offerPrice = navPrices[fund] * (fundStats[fund]?.offerRatio ?? 1);
+      portfolio[fund] += delta / offerPrice;
+    }
   }
 }
 
