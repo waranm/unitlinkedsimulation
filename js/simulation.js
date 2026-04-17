@@ -530,19 +530,38 @@ function runScenario(params) {
     //    By construction:  Cov(w) = L · Lᵀ = Σ,  so w[i] ~ N(0, std_i²)
     //    with the historical inter-fund correlations embedded.
     //
-    //    Regime switching: the current regime scales the historical mean (muScale)
-    //    and the shock magnitude (sigmaScale) without touching the Cholesky
-    //    structure — inter-fund correlations are preserved across all regimes.
-    const muScale    = regimeSwitching ? regimes[regimeIdx].muScale    : 1;
-    const sigmaScale = regimeSwitching ? regimes[regimeIdx].sigmaScale : 1;
-
+    //    Regime switching — per-fund scale resolution (priority order):
+    //      1. regime.fundScales[fundName]   — explicit per-fund override
+    //      2. regime.defaultScale            — fallback for unlisted funds
+    //      3. flat regime.muScale/sigmaScale — legacy single-scalar format
+    //      4. {muScale:1, sigmaScale:1}      — no-op (regime switching off)
+    //
+    //    Two drift modes (per fund):
+    //      muOverride  — absolute monthly log-return (ignores historical μ̂)
+    //                    use for assets whose crisis role is independent of
+    //                    historical performance: gold, bonds, alternatives
+    //      muScale     — multiplies historical μ̂ (proportional scaling)
+    //                    use for equity where regime amplifies/reverses trend
     const z = Array.from({ length: nFunds }, () => randNormal(rng));
     for (let i = 0; i < nFunds; i++) {
       let shock = 0;
       for (let k = 0; k <= i; k++) shock += choleskyL[i][k] * z[k];
-      nav[funds[i]] = nav[funds[i]] * Math.exp(
-        fundStats[funds[i]].mean * muScale + shock * sigmaScale
-      );
+
+      let mu = fundStats[funds[i]].mean; // default: historical mean
+      let sigmaScale = 1;
+
+      if (regimeSwitching) {
+        const regime = regimes[regimeIdx];
+        const s = regime.fundScales?.[funds[i]] ?? regime.defaultScale ?? regime;
+        sigmaScale = s.sigmaScale ?? 1;
+        if ('muOverride' in s) {
+          mu = s.muOverride;              // absolute: ignore historical μ̂
+        } else {
+          mu = fundStats[funds[i]].mean * (s.muScale ?? 1); // scale historical μ̂
+        }
+      }
+
+      nav[funds[i]] = nav[funds[i]] * Math.exp(mu + shock * sigmaScale);
     }
 
     // Transition to next regime using the Markov transition matrix

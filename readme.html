@@ -507,45 +507,145 @@
         π ≈ [0.622, 0.323, 0.055]  → Bull 62%, Bear 32%, Crisis 5%
       </div>
 
-      <div class="fix-section-label" style="margin-top:16px">Config — วิธีเปิดใช้และปรับค่า</div>
+      <div class="fix-section-label" style="margin-top:16px">สองโหมด Drift — muScale vs muOverride</div>
+      <div class="two-col">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#1d4ed8;margin-bottom:6px">muScale — proportional</div>
+          <code>drift = μ̂ × muScale</code><br><br>
+          ใช้กับ <strong>equity</strong> ที่ regime คือการ amplify/reverse แนวโน้มในอดีต<br><br>
+          <span style="color:#6c7086">EM Equity, DM Equity, Thematic</span>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#15803d;margin-bottom:6px">muOverride — absolute</div>
+          <code>drift = muOverride</code> (ค่าสัมบูรณ์ ต่อเดือน)<br><br>
+          ใช้กับ asset ที่ <strong>role เปลี่ยน</strong> ตาม regime เช่น gold ขึ้นใน crisis, bond rally ใน bear — ไม่สัมพันธ์กับ historical μ̂<br><br>
+          <span style="color:#6c7086">Gold, Bond/Income, Money Market</span>
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Config — per-fund regime scales</div>
       <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
-        ค่า default ที่แนะนำสำหรับกองทุนหุ้นไทย / ตลาดเกิดใหม่:
+        ลำดับ priority ในการ resolve scale ต่อกองทุน:
+        <strong>fundScales[name]</strong> → <strong>defaultScale</strong> → <strong>muScale/sigmaScale แบน (legacy)</strong> → <code>{1, 1}</code>
       </p>
-      <pre><code><span class="cmt">// ส่งเข้า runMonteCarlo(config, onProgress)</span>
-{
-  <span class="cmt">// ... ค่าอื่นๆ เช่น navData, premium, months ...</span>
+      <pre><code><span class="kw">regimeSwitching</span>: <span class="kw">true</span>,
 
-  <span class="kw">regimeSwitching</span>: <span class="kw">true</span>,   <span class="cmt">// false = ปิด, ใช้ GBM ปกติ (default)</span>
+<span class="kw">regimes</span>: [
+  {
+    name: <span class="str">'Bull'</span>,
+    defaultScale: { muScale: <span class="num">1.0</span>, sigmaScale: <span class="num">1.0</span> }, <span class="cmt">// fallback กองที่ไม่ระบุ</span>
+    fundScales: {
+      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">1.5</span>,              sigmaScale: <span class="num">0.7</span>  }, <span class="cmt">// EM equity</span>
+      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">1.3</span>,              sigmaScale: <span class="num">0.8</span>  }, <span class="cmt">// DM equity</span>
+      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.001</span>,           sigmaScale: <span class="num">0.8</span>  }, <span class="cmt">// bond: +0.1%/เดือน</span>
+      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">-0.002</span>,          sigmaScale: <span class="num">1.1</span>  }, <span class="cmt">// gold lags in bull</span>
+    },
+  },
+  {
+    name: <span class="str">'Bear'</span>,
+    defaultScale: { muScale: <span class="num">-0.5</span>, sigmaScale: <span class="num">1.5</span> },
+    fundScales: {
+      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">-0.5</span>,             sigmaScale: <span class="num">1.8</span>  },
+      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">-0.3</span>,             sigmaScale: <span class="num">1.5</span>  },
+      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.004</span>,           sigmaScale: <span class="num">1.2</span>  }, <span class="cmt">// flight to quality</span>
+      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">0.006</span>,           sigmaScale: <span class="num">1.4</span>  }, <span class="cmt">// safe haven</span>
+    },
+  },
+  {
+    name: <span class="str">'Crisis'</span>,
+    defaultScale: { muScale: <span class="num">-2.0</span>, sigmaScale: <span class="num">2.5</span> },
+    fundScales: {
+      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">-3.0</span>,             sigmaScale: <span class="num">3.0</span>  },
+      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">-2.0</span>,             sigmaScale: <span class="num">2.5</span>  },
+      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.008</span>,           sigmaScale: <span class="num">1.8</span>  }, <span class="cmt">// bond crisis rally</span>
+      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">0.015</span>,           sigmaScale: <span class="num">2.0</span>  }, <span class="cmt">// +1.5%/เดือน safe-haven</span>
+    },
+  },
+],
 
-  <span class="kw">regimes</span>: [
-    { name: <span class="str">'Bull'</span>,   muScale:  <span class="num">1.5</span>,  sigmaScale: <span class="num">0.7</span>  },
-    { name: <span class="str">'Bear'</span>,   muScale: <span class="num">-0.5</span>,  sigmaScale: <span class="num">1.8</span>  },
-    { name: <span class="str">'Crisis'</span>, muScale: <span class="num">-3.0</span>,  sigmaScale: <span class="num">3.0</span>  },
-  ],
+<span class="kw">transitionMatrix</span>: [
+  <span class="cmt">//        Bull   Bear   Crisis</span>
+  <span class="cmt">/* Bull   */</span> [<span class="num">0.90</span>, <span class="num">0.09</span>, <span class="num">0.01</span>],
+  <span class="cmt">/* Bear   */</span> [<span class="num">0.15</span>, <span class="num">0.75</span>, <span class="num">0.10</span>],
+  <span class="cmt">/* Crisis */</span> [<span class="num">0.25</span>, <span class="num">0.45</span>, <span class="num">0.30</span>],
+],</code></pre>
 
-  <span class="kw">transitionMatrix</span>: [
-    <span class="cmt">//        Bull   Bear   Crisis</span>
-    <span class="cmt">/* Bull   */</span> [<span class="num">0.90</span>, <span class="num">0.09</span>, <span class="num">0.01</span>],
-    <span class="cmt">/* Bear   */</span> [<span class="num">0.15</span>, <span class="num">0.75</span>, <span class="num">0.10</span>],
-    <span class="cmt">/* Crisis */</span> [<span class="num">0.25</span>, <span class="num">0.45</span>, <span class="num">0.30</span>],
-  ],
-}</code></pre>
+      <div class="fix-section-label" style="margin-top:16px">ค่าอ้างอิงสำหรับ Asset Class ต่างๆ</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">Asset Class</th>
+              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Bull muScale</th>
+              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Bear muScale</th>
+              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Crisis muScale</th>
+              <th style="padding:8px 12px;text-align:center;color:#7c3aed">Crisis sigmaScale</th>
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">EM Equity</td>
+              <td style="padding:8px 12px;text-align:center">1.5</td>
+              <td style="padding:8px 12px;text-align:center">−0.5</td>
+              <td style="padding:8px 12px;text-align:center">−3.0</td>
+              <td style="padding:8px 12px;text-align:center">3.0</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">muScale, volatile</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">DM / Global Equity</td>
+              <td style="padding:8px 12px;text-align:center">1.3</td>
+              <td style="padding:8px 12px;text-align:center">−0.3</td>
+              <td style="padding:8px 12px;text-align:center">−2.0</td>
+              <td style="padding:8px 12px;text-align:center">2.5</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">muScale, ลด extreme</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">Thematic Equity</td>
+              <td style="padding:8px 12px;text-align:center">2.0</td>
+              <td style="padding:8px 12px;text-align:center">−1.0</td>
+              <td style="padding:8px 12px;text-align:center">−4.0</td>
+              <td style="padding:8px 12px;text-align:center">3.5</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">muScale, amplify EM</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">Gold</td>
+              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
+              <td style="padding:8px 12px;text-align:center">2.0</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">Bull: −0.002, Bear: +0.006, Crisis: +0.015</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">Bond / Income</td>
+              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
+              <td style="padding:8px 12px;text-align:center">1.8</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">Bull: +0.001, Bear: +0.004, Crisis: +0.008</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-weight:600">Money Market</td>
+              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
+              <td style="padding:8px 12px;text-align:center">1.2</td>
+              <td style="padding:8px 12px;color:var(--gray-500)">Bull: +0.002, Bear: +0.002, Crisis: +0.001</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <div class="fix-section-label" style="margin-top:16px">กฎที่ต้องรักษาเมื่อแก้ค่า</div>
       <div class="math-box">
         1. แต่ละแถวของ transitionMatrix ต้องรวมกัน = 1.0<br>
-        &nbsp;&nbsp;&nbsp;เช่น 0.90 + 0.09 + 0.01 = 1.0 ✓<br><br>
-        2. จำนวนแถว/คอลัมน์ของ transitionMatrix ต้องเท่ากับจำนวน regimes<br><br>
-        3. sigmaScale ต้องมากกว่า 0 เสมอ (ความผันผวนติดลบไม่มีความหมาย)<br><br>
-        4. ถ้า regimeSwitching: false — ระบบใช้ GBM ปกติ ไม่ต้องส่ง regimes
+        2. จำนวนแถว/คอลัมน์ของ transitionMatrix ต้องเท่ากับจำนวน regimes<br>
+        3. sigmaScale ต้องมากกว่า 0 เสมอ<br>
+        4. muOverride หน่วยเป็น log-return ต่อเดือน (0.01 ≈ +1%/เดือน)<br>
+        5. กองใหม่ที่ไม่ได้ระบุใน fundScales จะ fallback ไป defaultScale อัตโนมัติ
       </div>
 
       <div class="impact-box">
         <span class="impact-icon">✓</span>
         <div>
           Correlation structure (Cholesky L) คงเดิมทุก regime
-          — เฉพาะ scale ของ mean และ volatility เปลี่ยน
-          ทำให้ inter-fund correlation ระหว่าง Bull/Bear/Crisis สอดคล้องกัน
+          — เฉพาะ drift และ volatility scale ของแต่ละกองเปลี่ยน
+          กองใหม่ที่เพิ่มในอนาคตไม่ต้อง modify simulation.js —
+          ระบุ fundScales ใน config เพียงอย่างเดียว
         </div>
       </div>
     </div>
