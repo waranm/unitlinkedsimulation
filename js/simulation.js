@@ -267,6 +267,45 @@ function cholesky(A) {
   return L;
 }
 
+// ─── Regime switching helpers ─────────────────────────────────────────────────
+
+/**
+ * Compute the stationary distribution of a Markov transition matrix
+ * via power iteration (1000 steps — converges for any ergodic chain).
+ * The stationary distribution π satisfies π = π · P.
+ * Used to initialise the regime state at the start of each scenario.
+ * @param {number[][]} P  n×n row-stochastic transition matrix
+ * @returns {number[]}    stationary probability vector of length n
+ */
+function computeStationaryDist(P) {
+  const n = P.length;
+  let v = new Array(n).fill(1 / n);
+  for (let iter = 0; iter < 1000; iter++) {
+    const next = new Array(n).fill(0);
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < n; j++)
+        next[j] += v[i] * P[i][j];
+    v = next;
+  }
+  return v;
+}
+
+/**
+ * Sample an index from a probability array using the provided PRNG.
+ * @param {number[]}         probs  probabilities (must sum to 1)
+ * @param {function():number} rng
+ * @returns {number}  sampled index
+ */
+function sampleFromCDF(probs, rng) {
+  const r = rng();
+  let cum = 0;
+  for (let i = 0; i < probs.length; i++) {
+    cum += probs[i];
+    if (r < cum) return i;
+  }
+  return probs.length - 1; // guard for floating-point rounding
+}
+
 // ─── Combined simulation parameters ──────────────────────────────────────────
 
 /**
@@ -446,9 +485,13 @@ function rebalance(portfolio, navPrices, fundStats, allocation) {
  *   - premium        premium per payment period (THB)
  *   - premiumMonths  Set of 0-based month indices when premium is paid
  *   - rebalanceMode  'none' | 'monthly' | 'quarterly' | 'annual'
- *   - initialNav     { fundName: startingNAV }
- *   - feeParams      fee config (passed through to applyFees)
- *   - rng            seeded PRNG function from mulberry32(); defaults to Math.random
+ *   - initialNav        { fundName: startingNAV }
+ *   - feeParams         fee config (passed through to applyFees)
+ *   - rng               seeded PRNG function from mulberry32(); defaults to Math.random
+ *   - regimeSwitching   boolean — enable Markov regime switching (default false)
+ *   - regimes           [{ name, muScale, sigmaScale }] — regime definitions
+ *   - transitionMatrix  number[][] — row-stochastic n×n Markov transition matrix
+ *   - stationaryDist    number[]  — stationary distribution (pre-computed)
  * @returns {number[]}  portfolio value (at BID) at end of each month
  */
 function runScenario(params) {
@@ -457,7 +500,11 @@ function runScenario(params) {
     allocation, months,
     premiumMonths, premium,
     rebalanceMode, initialNav, feeParams = {},
-    rng = Math.random
+    rng = Math.random,
+    regimeSwitching = false,
+    regimes = [],
+    transitionMatrix = [],
+    stationaryDist = []
   } = params;
 
   const funds = fundOrder;
@@ -472,6 +519,9 @@ function runScenario(params) {
 
   const values = new Array(months);
 
+  // Initialise regime state from stationary distribution (regime switching only)
+  let regimeIdx = regimeSwitching ? sampleFromCDF(stationaryDist, rng) : 0;
+
   for (let m = 0; m < months; m++) {
     // 1. Simulate NAV movement — correlated shocks via Cholesky decomposition.
     //
@@ -479,13 +529,24 @@ function runScenario(params) {
     //    triangular Cholesky factor of the covariance matrix Σ.
     //    By construction:  Cov(w) = L · Lᵀ = Σ,  so w[i] ~ N(0, std_i²)
     //    with the historical inter-fund correlations embedded.
-    //    The NAV update then uses  mean_i + w[i]  (no separate std scaling).
+    //
+    //    Regime switching: the current regime scales the historical mean (muScale)
+    //    and the shock magnitude (sigmaScale) without touching the Cholesky
+    //    structure — inter-fund correlations are preserved across all regimes.
+    const muScale    = regimeSwitching ? regimes[regimeIdx].muScale    : 1;
+    const sigmaScale = regimeSwitching ? regimes[regimeIdx].sigmaScale : 1;
+
     const z = Array.from({ length: nFunds }, () => randNormal(rng));
     for (let i = 0; i < nFunds; i++) {
       let shock = 0;
       for (let k = 0; k <= i; k++) shock += choleskyL[i][k] * z[k];
-      nav[funds[i]] = nav[funds[i]] * Math.exp(fundStats[funds[i]].mean + shock);
+      nav[funds[i]] = nav[funds[i]] * Math.exp(
+        fundStats[funds[i]].mean * muScale + shock * sigmaScale
+      );
     }
+
+    // Transition to next regime using the Markov transition matrix
+    if (regimeSwitching) regimeIdx = sampleFromCDF(transitionMatrix[regimeIdx], rng);
 
     // 2. Add premium contribution — buy units at Offer price
     if (premiumMonths.has(m)) {
@@ -555,8 +616,14 @@ async function runMonteCarlo(config, onProgress) {
   const {
     navData, allocation, premium, paymentMode,
     months, rebalanceMode, N, feeParams = {},
-    seed = Date.now()
+    seed = Date.now(),
+    regimeSwitching = false,
+    regimes = [],
+    transitionMatrix = []
   } = config;
+
+  // Pre-compute stationary distribution once — shared across all scenarios
+  const stationaryDist = regimeSwitching ? computeStationaryDist(transitionMatrix) : [];
 
   const { fundStats, fundOrder, choleskyL } = calcSimParams(navData);
   const funds = fundOrder;
@@ -585,7 +652,8 @@ async function runMonteCarlo(config, onProgress) {
       fundStats, fundOrder, choleskyL,
       allocation: allocFrac, months,
       premium, premiumMonths,
-      rebalanceMode, initialNav, feeParams, rng
+      rebalanceMode, initialNav, feeParams, rng,
+      regimeSwitching, regimes, transitionMatrix, stationaryDist
     });
     allSeries.push(series);
 

@@ -164,6 +164,7 @@
       <li><a href="#stats">การประมาณค่าสถิติ (μ, σ)</a></li>
       <li><a href="#correlation">Correlation Matrix และ Cholesky Decomposition</a></li>
       <li><a href="#gbm">โมเดล GBM — การ Simulate NAV</a></li>
+      <li><a href="#regime">Regime Switching — Markov Transition Model</a></li>
       <li><a href="#dca">DCA Premium และ Offer/BID Pricing</a></li>
       <li><a href="#rebalance">Rebalancing</a></li>
       <li><a href="#output">Output — Percentile Bands, Mean, IRR</a></li>
@@ -442,7 +443,116 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       6. DCA
+       6. Regime Switching
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="regime">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Regime Switching — Markov Transition Model</div>
+        <div class="fix-file">simulation.js · runScenario() · computeStationaryDist() · sampleFromCDF()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-math">Math</span>
+        <span class="badge badge-stats">Optional</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ทำไมต้องใช้ Regime Switching</div>
+      <p style="font-size:14px;color:var(--gray-700);line-height:1.7;margin-bottom:16px">
+        โมเดล GBM พื้นฐานใช้ μ และ σ <strong>คงที่ตลอด simulation</strong>
+        แต่ตลาดจริงสลับระหว่าง "สภาวะ" ที่แตกต่างกัน เช่น Bull market, Bear market, และ Crisis
+        แต่ละสภาวะมี return และความผันผวนต่างกัน และแนวโน้มที่จะ<em>อยู่ใน</em>หรือ<em>ออกจาก</em>สภาวะนั้นก็ต่างกัน
+        Regime Switching model จำลองพฤติกรรมนี้ด้วย <strong>Markov Chain</strong>
+        ทำให้ downside scenarios สมจริงยิ่งขึ้น (fat tail, volatility clustering)
+      </p>
+
+      <div class="fix-section-label">Markov Chain — หลักการ</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ทุกเดือน simulation อยู่ใน <strong>regime</strong> หนึ่งเสมอ
+        ความน่าจะเป็นในการเปลี่ยน regime ขึ้นกับเฉพาะ<em>สภาวะปัจจุบัน</em>เท่านั้น (Markov property)
+        ไม่ใช่ประวัติการณ์ทั้งหมด
+      </p>
+      <div class="math-box">
+        P(regime ถัดไป = j | regime ปัจจุบัน = i) = P[i][j]<br><br>
+        ตัวอย่าง transition matrix (3 regimes):<br><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Bull &nbsp;Bear &nbsp;Crisis<br>
+        Bull &nbsp;&nbsp;[ 0.90 &nbsp;0.09 &nbsp;0.01 ]&nbsp;&nbsp;<span style="color:#6c7086">← อยู่ Bull มีโอกาส 90% ยังอยู่ Bull ต่อ</span><br>
+        Bear &nbsp;&nbsp;[ 0.15 &nbsp;0.75 &nbsp;0.10 ]&nbsp;&nbsp;<span style="color:#6c7086">← Bear มีโอกาส 15% ฟื้นเป็น Bull</span><br>
+        Crisis [ 0.25 &nbsp;0.45 &nbsp;0.30 ]&nbsp;&nbsp;<span style="color:#6c7086">← Crisis มักเปลี่ยนเป็น Bear ก่อน</span>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Regime Parameters — muScale และ sigmaScale</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แต่ละ regime <strong>ปรับ scale</strong> ค่า μ และ σ ที่ประมาณจากข้อมูลจริง
+        แทนการกำหนดค่าสัมบูรณ์ วิธีนี้ทำให้ใช้ได้กับทุกกองทุนโดยไม่ต้องรู้ค่าจริงล่วงหน้า
+      </p>
+      <div class="math-box">
+        NAV_t = NAV_{t−1} · exp(μ̂ · <strong>muScale</strong> + w_t · <strong>sigmaScale</strong>)<br><br>
+        muScale &gt; 1 &nbsp;&nbsp;→ return สูงกว่าค่าเฉลี่ยประวัติศาสตร์ (Bull)<br>
+        muScale &lt; 0 &nbsp;&nbsp;→ market ติดลบ (Bear / Crisis)<br>
+        sigmaScale &gt; 1 → ความผันผวนสูงกว่าปกติ<br>
+        sigmaScale &lt; 1 → ตลาดนิ่ง, ผันผวนน้อย
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Stationary Distribution — การตั้งต้น Regime</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ต้นแต่ละ scenario จะสุ่ม regime เริ่มต้นจาก <strong>stationary distribution</strong> π
+        ซึ่งคือสัดส่วนเวลาที่ chain ใช้ใน regime นั้นในระยะยาว
+        คำนวณโดย power iteration จนกว่าจะ converge (1000 รอบ)
+      </p>
+      <div class="math-box">
+        π = π · P &nbsp;&nbsp;&nbsp;<span style="color:#6c7086">← stationary dist satisfies this equation</span><br><br>
+        ตัวอย่างจาก matrix ข้างต้น:<br>
+        π ≈ [0.622, 0.323, 0.055]  → Bull 62%, Bear 32%, Crisis 5%
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Config — วิธีเปิดใช้และปรับค่า</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ค่า default ที่แนะนำสำหรับกองทุนหุ้นไทย / ตลาดเกิดใหม่:
+      </p>
+      <pre><code><span class="cmt">// ส่งเข้า runMonteCarlo(config, onProgress)</span>
+{
+  <span class="cmt">// ... ค่าอื่นๆ เช่น navData, premium, months ...</span>
+
+  <span class="kw">regimeSwitching</span>: <span class="kw">true</span>,   <span class="cmt">// false = ปิด, ใช้ GBM ปกติ (default)</span>
+
+  <span class="kw">regimes</span>: [
+    { name: <span class="str">'Bull'</span>,   muScale:  <span class="num">1.5</span>,  sigmaScale: <span class="num">0.7</span>  },
+    { name: <span class="str">'Bear'</span>,   muScale: <span class="num">-0.5</span>,  sigmaScale: <span class="num">1.8</span>  },
+    { name: <span class="str">'Crisis'</span>, muScale: <span class="num">-3.0</span>,  sigmaScale: <span class="num">3.0</span>  },
+  ],
+
+  <span class="kw">transitionMatrix</span>: [
+    <span class="cmt">//        Bull   Bear   Crisis</span>
+    <span class="cmt">/* Bull   */</span> [<span class="num">0.90</span>, <span class="num">0.09</span>, <span class="num">0.01</span>],
+    <span class="cmt">/* Bear   */</span> [<span class="num">0.15</span>, <span class="num">0.75</span>, <span class="num">0.10</span>],
+    <span class="cmt">/* Crisis */</span> [<span class="num">0.25</span>, <span class="num">0.45</span>, <span class="num">0.30</span>],
+  ],
+}</code></pre>
+
+      <div class="fix-section-label" style="margin-top:16px">กฎที่ต้องรักษาเมื่อแก้ค่า</div>
+      <div class="math-box">
+        1. แต่ละแถวของ transitionMatrix ต้องรวมกัน = 1.0<br>
+        &nbsp;&nbsp;&nbsp;เช่น 0.90 + 0.09 + 0.01 = 1.0 ✓<br><br>
+        2. จำนวนแถว/คอลัมน์ของ transitionMatrix ต้องเท่ากับจำนวน regimes<br><br>
+        3. sigmaScale ต้องมากกว่า 0 เสมอ (ความผันผวนติดลบไม่มีความหมาย)<br><br>
+        4. ถ้า regimeSwitching: false — ระบบใช้ GBM ปกติ ไม่ต้องส่ง regimes
+      </div>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          Correlation structure (Cholesky L) คงเดิมทุก regime
+          — เฉพาะ scale ของ mean และ volatility เปลี่ยน
+          ทำให้ inter-fund correlation ระหว่าง Bull/Bear/Crisis สอดคล้องกัน
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       8. DCA
   ══════════════════════════════════════════════════════════════════════════ -->
   <div class="fix-card" id="dca">
     <div class="fix-header">
@@ -486,7 +596,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       7. Rebalancing
+       9. Rebalancing
   ══════════════════════════════════════════════════════════════════════════ -->
   <div class="fix-card" id="rebalance">
     <div class="fix-header">
@@ -528,7 +638,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       8. Output
+       10. Output
   ══════════════════════════════════════════════════════════════════════════ -->
   <div class="fix-card" id="output">
     <div class="fix-header">
@@ -587,7 +697,7 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       9. Limitations
+       11. Limitations
   ══════════════════════════════════════════════════════════════════════════ -->
   <div class="fix-card" id="limits">
     <div class="fix-header">
