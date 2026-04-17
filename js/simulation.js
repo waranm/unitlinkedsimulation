@@ -18,6 +18,35 @@
 // ─── Stats helpers ───────────────────────────────────────────────────────────
 
 /**
+ * Forward-fill (LOCF) calendar-day gaps in a daily NAV series.
+ * Handles fund holidays and non-overlapping trading calendars: any date
+ * with no recorded price receives the last known price before it.
+ * Only runs on daily data (avgGap < 20 days); monthly series are returned
+ * unchanged to avoid inflating row counts.
+ * @param {Array} rows  sorted [{ date: Date, nav, offer, bid }]
+ * @returns {Array}     same rows with date-gaps filled
+ */
+function forwardFillDaily(rows) {
+  if (rows.length < 2) return rows;
+
+  const spanDays = (rows[rows.length - 1].date - rows[0].date) / 86400000;
+  const avgGap = spanDays / (rows.length - 1);
+  if (avgGap >= 20) return rows; // monthly data — skip
+
+  const result = [];
+  for (let i = 0; i < rows.length - 1; i++) {
+    result.push(rows[i]);
+    const gapDays = Math.round((rows[i + 1].date - rows[i].date) / 86400000);
+    for (let d = 1; d < gapDays; d++) {
+      const fillDate = new Date(rows[i].date.getTime() + d * 86400000);
+      result.push({ ...rows[i], date: fillDate });
+    }
+  }
+  result.push(rows[rows.length - 1]);
+  return result;
+}
+
+/**
  * Resample a daily (or sub-monthly) row array to monthly end-of-month values.
  * Groups rows by YYYY-MM and keeps the last row of each month.
  * If data is already monthly (≤ 1 row per month on average), returns as-is.
@@ -59,10 +88,10 @@ function calcFundStats(navData) {
       continue;
     }
 
-    // Resample to monthly so that each simulation step (1 month) uses
-    // correctly-scaled return stats. Without this, daily data produces
-    // ~21× understated mean returns.
-    const rows = resampleMonthly(rawRows);
+    // Forward-fill holiday gaps first, then resample to monthly.
+    // Without forwardFillDaily, a fund closed on the last trading day(s) of
+    // a month could lose that month's end-of-month row after resampling.
+    const rows = resampleMonthly(forwardFillDaily(rawRows));
 
     // Monthly log-returns from NAV
     const returns = [];
@@ -100,9 +129,45 @@ function calcFundStats(navData) {
 // ─── Aligned monthly returns ──────────────────────────────────────────────────
 
 /**
+ * Forward-fill (LOCF) and backfill-at-inception a YYYY-MM → NAV map so that
+ * every month in `allMonths` has a value.
+ *
+ * - Months before the fund's first data point → filled with the first known NAV
+ *   (inception backfill, keeps matrix dimensions equal across funds).
+ * - Months after a fund's last data point or internal holiday gaps → filled
+ *   with the last known NAV (LOCF / forward fill).
+ *
+ * @param {Map<string,number>} monthMap  raw YYYY-MM → NAV for one fund
+ * @param {string[]}           allMonths sorted list of all months in the union
+ * @returns {Map<string,number>}         fully-filled map, no missing months
+ */
+function fillMonthlyGaps(monthMap, allMonths) {
+  // Find the first recorded value (needed for inception backfill)
+  let firstKnown = null;
+  for (const m of allMonths) {
+    if (monthMap.has(m)) { firstKnown = monthMap.get(m); break; }
+  }
+  if (firstKnown === null) return monthMap; // fund has no data at all
+
+  const filled = new Map();
+  let lastKnown = null;
+  for (const m of allMonths) {
+    if (monthMap.has(m)) {
+      lastKnown = monthMap.get(m);
+      filled.set(m, lastKnown);
+    } else {
+      // Before inception: backfill with first known; after inception: LOCF
+      filled.set(m, lastKnown !== null ? lastKnown : firstKnown);
+    }
+  }
+  return filled;
+}
+
+/**
  * For every fund in navData, build a YYYY-MM → NAV map (end-of-month value),
- * then keep only the months present in ALL funds.
- * Returns the log-return matrix needed for the covariance calculation.
+ * then align across all funds using the UNION of all months (not intersection).
+ * Missing months are filled via LOCF (forward) or inception backfill (backward)
+ * so that every fund has a value in every month of the union.
  *
  * @param {Object} navData  { fundName: [{ date: Date, nav }] }
  * @returns {{
@@ -123,19 +188,20 @@ function getAlignedMonthlyReturns(navData) {
     return m;
   });
 
-  // Intersection of months present across all funds
-  let common = new Set(monthMaps[0].keys());
-  for (let i = 1; i < monthMaps.length; i++) {
-    for (const k of common) { if (!monthMaps[i].has(k)) common.delete(k); }
-  }
-  const sorted = Array.from(common).sort();
+  // Union of all months present across any fund
+  const allMonthsSet = new Set();
+  for (const m of monthMaps) for (const k of m.keys()) allMonthsSet.add(k);
+  const allMonths = Array.from(allMonthsSet).sort();
 
-  // Log-return matrix: only include a period if both end-months are in the intersection
+  // Fill each fund's map so every month in the union has a value
+  const filledMaps = monthMaps.map(m => fillMonthlyGaps(m, allMonths));
+
+  // Log-return matrix over the full union timeline
   const returns = fundOrder.map((_, fi) => {
     const out = [];
-    for (let t = 1; t < sorted.length; t++) {
-      const prev = monthMaps[fi].get(sorted[t - 1]);
-      const curr = monthMaps[fi].get(sorted[t]);
+    for (let t = 1; t < allMonths.length; t++) {
+      const prev = filledMaps[fi].get(allMonths[t - 1]);
+      const curr = filledMaps[fi].get(allMonths[t]);
       const r = Math.log(curr / prev);
       out.push(isFinite(r) ? r : 0);
     }
