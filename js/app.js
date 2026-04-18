@@ -24,7 +24,9 @@ const state = {
   premium: 5000,
   paymentMode: 'monthly',
   selectedPeriod: null,
-  rebalanceMode: 'none',
+  allResults: null,
+  recommendedMode: null,
+  recommendMessage: '',
   N: 1000,
   allocation: {},
 
@@ -32,7 +34,6 @@ const state = {
   selectedPcts: [25, 50, 75, 98],
   showMean: true,           // toggle for mean overlay on chart
 
-  compareRebalance: false,  // compare-mode toggle
   compareResults: null,     // { monthly, quarterly, annual } — cached when compare mode runs
 };
 
@@ -529,9 +530,7 @@ function updateAllocTotal() {
 document.getElementById('btnNext2').addEventListener('click', () => {
   state.premium       = parseFloat(document.getElementById('inputPremium').value) || 5000;
   state.paymentMode   = document.getElementById('selectPayment').value;
-  state.rebalanceMode    = document.querySelector('input[name="rebalance"]:checked')?.value || 'none';
   state.N                = parseInt(document.getElementById('inputN').value) || 1000;
-  state.compareRebalance = document.getElementById('cbCompareRebalance').checked;
 
   if (!state.selectedPeriod) { alert('กรุณาเลือกระยะเวลา Simulation'); return; }
   const allocTotal = Object.values(state.allocation).reduce((s, v) => s + v, 0);
@@ -557,16 +556,11 @@ function renderRunSummary() {
     ? s.selectedPeriod % 12 === 0 ? `${s.selectedPeriod / 12} ปี` : `${s.selectedPeriod} เดือน`
     : '-';
   const modeLabel  = { monthly:'รายเดือน', quarterly:'รายไตรมาส', 'semi-annual':'ราย 6 เดือน', annual:'รายปี' };
-  const rebalLabel = { none:'ไม่มี', monthly:'รายเดือน', quarterly:'รายไตรมาส', annual:'รายปี' };
   const funds = s.fundNames.map(f => `${f} ${s.allocation[f]}%`).join(', ');
-  const rebalDisplay = s.compareRebalance
-    ? '<span style="color:var(--primary);font-weight:700">เปรียบเทียบ 4 กลยุทธ์ (ไม่ปรับ / รายเดือน / รายไตรมาส / รายปี)</span>'
-    : (rebalLabel[s.rebalanceMode] || s.rebalanceMode);
   document.getElementById('simSummary').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 28px">
       <div>💰 <strong>เบี้ย:</strong> ฿${(s.premium||0).toLocaleString()} / ${modeLabel[s.paymentMode]||s.paymentMode}</div>
       <div>📅 <strong>ระยะเวลา:</strong> ${periodLabel}</div>
-      <div>⚖️ <strong>Rebalancing:</strong> ${rebalDisplay}</div>
       <div>🎲 <strong>Monte Carlo N:</strong> ${(s.N||0).toLocaleString()} รอบ</div>
       <div style="grid-column:1/-1">🥧 <strong>Allocation:</strong> ${funds}</div>
       <div style="grid-column:1/-1;font-size:12px;color:var(--gray-500)">
@@ -631,29 +625,22 @@ async function runSimulation() {
   };
 
   try {
-    if (state.compareRebalance) {
-      // All modes share the same seed so Monte Carlo variance is eliminated
-      // from the comparison — any difference reflects rebalancing only.
-      const compareSeed = Date.now();
-      const modes = ['none', 'monthly', 'quarterly', 'annual'];
-      const compareResults = {};
-      for (let i = 0; i < modes.length; i++) {
-        compareResults[modes[i]] = await runMonteCarlo(
-          { ...baseConfig, rebalanceMode: modes[i], seed: compareSeed },
-          pct => setProgress((i * 100 + pct) / modes.length)
-        );
-      }
-      state.compareResults = compareResults;
-      // Primary mode drives the summary panel
-      const primary = modes.includes(state.rebalanceMode) ? state.rebalanceMode : 'none';
-      state.results = compareResults[primary];
-    } else {
-      state.compareResults = null;
-      state.results = await runMonteCarlo(
-        { ...baseConfig, rebalanceMode: state.rebalanceMode },
-        setProgress
+    // Always run all 4 frequencies with a shared seed so variance is eliminated
+    // from the comparison — any difference reflects rebalancing only.
+    const seed  = Date.now();
+    const modes = ['none', 'monthly', 'quarterly', 'annual'];
+    const allResults = {};
+    for (let i = 0; i < modes.length; i++) {
+      allResults[modes[i]] = await runMonteCarlo(
+        { ...baseConfig, rebalanceMode: modes[i], seed },
+        pct => setProgress((i * 100 + pct) / modes.length)
       );
     }
+    state.allResults = allResults;
+    const rec = recommendFrequency(allResults);
+    state.recommendedMode    = rec.mode;
+    state.recommendMessage   = rec.message;
+    state.results            = allResults[rec.mode];
 
     buildResultsStep();
     goToStep(3);
@@ -692,22 +679,13 @@ function fmtIRR(irr) {
 // ─── Step 4: Results ──────────────────────────────────────────────────────────
 
 function buildResultsStep() {
-  const isCompare = state.compareRebalance && state.compareResults;
+  document.querySelector('.pct-options').style.display         = '';
+  document.getElementById('rebalCompareInsight').style.display = '';
 
-  // Toggle chart-area elements depending on mode
-  document.querySelector('.pct-options').style.display        = isCompare ? 'none' : '';
-  document.getElementById('rebalCompareInsight').style.display = isCompare ? '' : 'none';
-
-  renderOutcomeSummary();    // 3-column summary — always uses state.results (primary mode)
-
-  if (isCompare) {
-    renderCompareRebalChart();    // P50 overlay of all 3 frequencies
-    renderRebalCompareInsight();  // dynamic insight text
-  } else {
-    renderPercentileChart();      // normal percentile chart with mean overlay
-  }
-
-  buildSummaryTable();      // detailed table
+  renderOutcomeSummary();
+  renderPercentileChart();
+  renderRebalCompareInsight();
+  buildSummaryTable();
 }
 
 function renderPercentileChart() {
@@ -722,56 +700,69 @@ function renderPercentileChart() {
   );
 }
 
-/** Render P50-only comparison chart for all 3 rebalance frequencies. */
-function renderCompareRebalChart() {
-  const ctx = document.getElementById('simulationChart').getContext('2d');
-  const primaryMode = ['none', 'monthly', 'quarterly', 'annual'].includes(state.rebalanceMode)
-    ? state.rebalanceMode : null;
-  renderCompareRebalanceChart(ctx, state.compareResults, primaryMode, new Date());
+/**
+ * Pick the recommended rebalance frequency from 4 simulation results.
+ * If max P50 − min P50 < 1% of min → all similar → recommend quarterly.
+ * Otherwise recommend the mode with highest P50.
+ */
+function recommendFrequency(allResults) {
+  const modes   = ['none', 'monthly', 'quarterly', 'annual'];
+  const nameMap = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
+
+  const p50s = {};
+  for (const mode of modes) {
+    const m = allResults[mode].months;
+    p50s[mode] = allResults[mode].percentiles[50][m - 1];
+  }
+
+  const values = Object.values(p50s);
+  const maxP50 = Math.max(...values);
+  const minP50 = Math.min(...values);
+  const spread = minP50 > 0 ? (maxP50 - minP50) / minP50 : 0;
+
+  if (spread < 0.01) {
+    return { mode: 'quarterly', message: 'ทุกความถี่ให้ผลใกล้เคียงกัน (<1% ต่างกัน) เลือกตามความสะดวก' };
+  }
+
+  const bestMode   = modes.find(m => p50s[m] === maxP50);
+  const noneP50    = p50s['none'];
+  const diffVsNone = noneP50 > 0 ? ((maxP50 - noneP50) / noneP50 * 100) : 0;
+  return {
+    mode: bestMode,
+    message: `กลยุทธ์${nameMap[bestMode]}ให้ผลลัพธ์ทั่วไปสูงกว่า ${diffVsNone.toFixed(1)}% เมื่อเทียบกับไม่ปรับสมดุล`,
+  };
 }
 
 /** Generate the compare-rebalance insight card with side-by-side table + insight text. */
 function renderRebalCompareInsight() {
   const el = document.getElementById('rebalCompareInsight');
-  if (!el || !state.compareResults) return;
+  if (!el || !state.allResults) return;
 
-  const cr         = state.compareResults;
-  const months     = state.results.months;
-  const totalPaid  = simTotalPremium();
-  const step       = simPaymentStep();
-  const primaryMode = ['none', 'monthly', 'quarterly', 'annual'].includes(state.rebalanceMode)
-    ? state.rebalanceMode : null;
+  const cr       = state.allResults;
+  const months   = state.results.months;
+  const totalPaid = simTotalPremium();
+  const step     = simPaymentStep();
+  const recMode  = state.recommendedMode || 'quarterly';
 
-  const MODES = ['none', 'monthly', 'quarterly', 'annual'];
+  const MODES    = ['none', 'monthly', 'quarterly', 'annual'];
   const nameMap  = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
-  const colorMap = { none: '#9ca3af',       monthly: '#1a56a0',  quarterly: '#e8a020',   annual: '#16a34a' };
+  const colorMap = { none: '#9ca3af', monthly: '#1a56a0', quarterly: '#e8a020', annual: '#16a34a' };
 
-  // Compute per-mode stats
   const rows = MODES.map(mode => {
-    const p50   = cr[mode].percentiles[50][months - 1];
+    const p50    = cr[mode].percentiles[50][months - 1];
     const profit = p50 - totalPaid;
-    const irr   = calcIRR(state.premium, step, months, p50);
+    const irr    = calcIRR(state.premium, step, months, p50);
     return { mode, p50, profit, irr };
   });
 
-  // Find best P50
-  const bestP50 = Math.max(...rows.map(r => r.p50));
-
-  // Build table rows
   const rowsHTML = rows.map(r => {
-    const isBest    = r.p50 === bestP50;
-    const isPrimary = r.mode === primaryMode;
+    const isRec     = r.mode === recMode;
     const profitCls = r.profit >= 0 ? 'positive' : 'negative';
     const irrCls    = r.irr !== null && r.irr >= 0 ? 'positive' : 'negative';
-
-    const badge = isBest
-      ? `<span class="rc-badge rc-badge--best">ดีที่สุด</span>`
-      : isPrimary
-        ? `<span class="rc-badge rc-badge--primary">ที่เลือก</span>`
-        : '';
+    const badge     = isRec ? `<span class="rc-badge rc-badge--best">⭐ แนะนำ</span>` : '';
 
     return `
-      <tr class="${isBest ? 'rc-row--best' : ''}">
+      <tr class="${isRec ? 'rc-row--best' : ''}">
         <td>
           <span class="rc-dot" style="background:${colorMap[r.mode]}"></span>
           ${nameMap[r.mode]}${badge}
@@ -782,23 +773,9 @@ function renderRebalCompareInsight() {
       </tr>`;
   }).join('');
 
-  // Insight text
-  const worstP50 = Math.min(...rows.map(r => r.p50));
-  const diffPct  = worstP50 > 0 ? ((bestP50 - worstP50) / worstP50 * 100) : 0;
-  const bestModeName = nameMap[rows.find(r => r.p50 === bestP50).mode];
-
-  let insight;
-  if (diffPct < 1) {
-    insight = 'ทั้ง 3 ความถี่ให้ผลลัพธ์ใกล้เคียงกันมาก สำหรับพอร์ตนี้การปรับสมดุลบ่อยหรือน้อยแทบไม่มีผลต่อมูลค่าสุดท้าย';
-  } else if (diffPct < 5) {
-    insight = `กลยุทธ์${bestModeName}ให้ผลลัพธ์ทั่วไปสูงกว่าเล็กน้อย (${diffPct.toFixed(1)}%) แต่ความแตกต่างไม่มาก — ทุกความถี่เหมาะสมสำหรับพอร์ตนี้`;
-  } else {
-    insight = `กลยุทธ์${bestModeName}ให้ผลลัพธ์ทั่วไปดีที่สุดสำหรับพอร์ตและระยะเวลานี้ สูงกว่าความถี่ที่ด้อยที่สุดประมาณ ${diffPct.toFixed(1)}%`;
-  }
-
   el.innerHTML = `
     <div class="card">
-      <div class="card-title"><span class="icon">⚖️</span> เปรียบเทียบความถี่การปรับสมดุล</div>
+      <div class="card-title"><span class="icon">⚖️</span> เปรียบเทียบความถี่การปรับสมดุล (Auto Rebalancing)</div>
 
       <table class="rc-table">
         <thead>
@@ -812,7 +789,7 @@ function renderRebalCompareInsight() {
         <tbody>${rowsHTML}</tbody>
       </table>
 
-      <p class="rc-insight">💡 ${insight}</p>
+      <p class="rc-insight">💡 ${state.recommendMessage || ''}</p>
     </div>
   `;
 }
@@ -842,6 +819,7 @@ function renderOutcomeSummary() {
   el.innerHTML = `
     <div class="card">
       <div class="card-title"><span class="icon">📊</span> สรุปผลลัพธ์</div>
+      <p class="rec-mode-note">💡 ตัวเลขนี้ใช้การปรับสมดุล: ${{ none:'ไม่ปรับสมดุล', monthly:'รายเดือน', quarterly:'รายไตรมาส', annual:'รายปี' }[state.recommendedMode] || '-'} (แนะนำ)</p>
 
       <div class="outcome-grid">
         <!-- P75 — Upside -->
@@ -941,17 +919,12 @@ document.getElementById('cbMean').addEventListener('change', e => {
   if (state.results) renderPercentileChart();
 });
 
-// Compare-rebalance toggle — show/hide hint text in step 2
-document.getElementById('cbCompareRebalance').addEventListener('change', e => {
-  document.getElementById('compareToggleHint').style.display = e.target.checked ? 'block' : 'none';
-});
-
 document.getElementById('btnExportCSV').addEventListener('click', () => {
   if (!state.results) return;
   exportSummaryCSV(
     state.results.percentiles, state.results.months,
     { premium: state.premium, paymentMode: state.paymentMode,
-      months: state.results.months, rebalanceMode: state.rebalanceMode, N: state.N },
+      months: state.results.months, rebalanceMode: state.recommendedMode, N: state.N },
     state.selectedPcts
   );
 });
