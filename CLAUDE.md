@@ -1,26 +1,88 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+คู่มือสำหรับ Claude Code เมื่อทำงานใน repo นี้ — **อ่านทุกครั้งก่อนเริ่ม edit**
+
+---
+
+## 🔴 CRITICAL RULES (ห้ามข้าม)
+
+### Rule 1: Verify Before Claiming Done
+ห้ามพูดคำว่า "เพิ่มแล้ว / แก้แล้ว / เสร็จแล้ว" จนกว่าจะ verify ด้วยคำสั่งจริง
+
+หลัง edit ทุกครั้ง:
+```bash
+grep -n "<keyword ที่เพิ่งเพิ่ม>" <file>    # ยืนยันว่าอยู่ในไฟล์จริง
+git diff <file>                              # ยืนยันว่า tool apply สำเร็จ
+```
+
+ถ้า grep ไม่เจอ = การ edit ไม่สำเร็จ ต้องแก้ใหม่และแจ้ง user ทันที
+ห้าม assume ว่า Edit/str_replace tool สำเร็จโดยไม่ verify
+
+### Rule 2: No Silent Rewrites
+ห้าม rewrite ทั้งไฟล์โดยไม่ได้รับอนุญาตชัดเจน
+
+- Default คือใช้ `str_replace` / `Edit` แก้เฉพาะจุด
+- ถ้าจำเป็นต้อง rewrite ทั้งไฟล์ ต้อง:
+  1. อ่านไฟล์เดิม 100% ก่อน
+  2. List function/feature ทั้งหมดที่มีอยู่เดิม
+  3. ถาม user เพื่อยืนยันว่าจะ preserve อะไร
+  4. หลัง rewrite ให้ diff กับของเดิม แจ้งว่าอะไรเปลี่ยน/หาย
+- ห้ามลบฟังก์ชันที่ user ไม่ได้สั่งให้ลบ — โดยเฉพาะ feature ในรายการ **Invariants** ด้านล่าง
+
+### Rule 3: Docs-Code Consistency
+ห้าม update README / CLAUDE.md / comment ที่อ้างถึง feature **ก่อน** implement และ verify ในโค้ดจริง
+
+ลำดับที่ถูกต้อง: แก้ code → grep verify → ค่อย update docs
+
+ถ้าเจอว่า docs อ้างถึงฟังก์ชันที่ไม่มีในโค้ด = **bug** ต้องรายงาน user ทันที
+
+---
+
+## 📐 Project Invariants (ห้ามหายไป)
+
+Feature เหล่านี้ต้องมีใน `js/simulation.js` เสมอ ก่อน edit ให้ grep เช็คก่อนว่าครบ ถ้าหายไปแม้แต่ข้อเดียว → **หยุดและแจ้ง user**
+
+| Feature | Keyword ที่ต้อง grep เจอ | สถานะ |
+|---|---|---|
+| Log-return GBM per fund | `Math.exp(mean + ... * randNormal())` หรือ Box-Muller | ✅ implemented |
+| Premium buys at Offer price | `offerPrice` / `offerRatio` ใน premium block | ✅ implemented |
+| Portfolio valuation at BID | `bidPrice` / `bidRatio` ใน valuation block | ✅ implemented |
+| Bid/Offer spread ใน rebalance | `bidRatio`, `offerRatio` | ✅ implemented |
+| Fee hook | `applyFees(` | ✅ implemented (no-op) |
+| Cholesky correlation between funds | `cholesky(`, `choleskyL`, `computeCovMatrix(` | ✅ implemented |
+| Aligned returns for covariance | `getAlignedMonthlyReturns(` | ✅ implemented |
+| Correlated shocks in scenario loop | `choleskyL[i][k] * z[k]` | ✅ implemented |
+
+Quick check command:
+```bash
+grep -cE "bidRatio|offerRatio|applyFees" js/simulation.js
+# ต้องเจอทุก keyword; ถ้าขาด = regression
+```
+
+### 🚧 Planned — NOT yet implemented
+
+ขณะนี้ไม่มี feature ที่รอ implement — Cholesky correlation ถูก implement และ verify แล้ว (all 78 tests pass, verified 2026-04-18)
+
+---
 
 ## Project Overview
 
-Pure-frontend Monte Carlo simulation tool for Unit Linked insurance products.  
-No build step, no dependencies to install — open `index.html` directly in a browser (or via a local static server).
+Pure-frontend Monte Carlo simulation tool for Unit Linked insurance products (กรมธรรม์ประกันควบการลงทุน).
+
+**Stack:** Vanilla JavaScript (ES6+), Chart.js via CDN. No build step, no dependencies to install, no test framework. Open `index.html` directly in a browser or via a local static server.
 
 ## Running the App
 
 ```bash
-# Option A: Python quick server (any directory)
+# Option A: Python
 python -m http.server 8080
 # then open http://localhost:8080
 
 # Option B: Node
 npx serve .
 
-# Option C: Just open index.html directly in Chrome/Edge
+# Option C: Open index.html directly in Chrome/Edge
 ```
-
-There are no tests, no linting config, and no build process.
 
 ## File Structure
 
@@ -37,7 +99,7 @@ sample-nav.csv      — Example CSV for manual testing
 ## Architecture
 
 ### State
-A single `state` object in `app.js` is the source of truth. All steps read/write it directly — no events or reactive system.
+A single `state` object in `app.js` is the source of truth. All steps read/write it directly — no events, no reactive system.
 
 ### Step flow
 `goToStep(idx)` swaps `.active` on `.section` divs and updates the stepper UI. Step 2→3 patches `goToStep` to inject a run-summary before simulation.
@@ -51,11 +113,104 @@ A single `state` object in `app.js` is the source of truth. All steps read/write
 `applyFees(portfolio, navPrices, feeParams, month)` in `simulation.js` is currently a no-op. Implement it there; pass fee config via `feeParams` in `runMonteCarlo()` → `runScenario()`. No other files need changing.
 
 ### CSV format expected
-Column 0 = date (YYYY-MM-DD, DD/MM/YYYY, or MM/DD/YYYY). Columns 1+ = NAV values per fund. `parseCSV()` in `app.js` handles parsing and rejects funds with < 2 valid rows.
+Column 0 = date (`YYYY-MM-DD`, `DD/MM/YYYY`, or `MM/DD/YYYY`). Columns 1+ = NAV values per fund. `parseCSV()` in `app.js` handles parsing and rejects funds with < 2 valid rows.
 
 ## Key Design Decisions
 
 - **Joint inception date** = latest first-date among all loaded funds; determines which period options are shown.
 - **Premium months** are pre-computed as a `Set` of 0-based month indices by `buildPremiumMonths()` — avoids per-step conditionals inside the hot loop.
 - **Rebalancing** occurs *after* fee deduction and *after* premium contribution each month.
-- Chart.js is loaded from CDN (`chart.umd.min.js` v4). If offline, swap for a local copy.
+- **Percentile aggregation:** P25, P50, P75, P98 เดือนต่อเดือน
+- **Sample variance** (หาร n-1) ไม่ใช่ population variance (หาร n) — เคยเป็น bug
+- Chart.js loaded from CDN (`chart.umd.min.js` v4). If offline, swap for a local copy.
+
+---
+
+## 🧪 Sanity Tests สำหรับ Simulation
+
+หลังแก้ simulation logic ให้ suggest user ทดสอบดังนี้ (หรือเขียน test script):
+
+1. **Single fund test** — allocation 100% ในกองเดียว ผลควรเหมือน GBM ปกติ
+2. **High correlation test** — ถ้า force correlation = 0.99, rebalance ไม่ควรมีผลต่างจาก no-rebalance
+3. **Negative correlation test** — correlation = -0.5, rebalance ควรให้ bonus ชัดเจน (IRR ต่างกัน > 0.3%)
+4. **Zero volatility test** — set std = 0, ผลทุก scenario ควรเท่ากัน
+5. **Percentile ordering** — P25 < P50 < P75 < P98 ทุกเดือน
+
+ถ้า test ไหนไม่ผ่าน = มี bug ใน simulation logic
+
+> **Note:** Tests 2-3 (correlation tests) ใช้งานได้แล้ว — Cholesky/correlation implement และ verify แล้ว (2026-04-18)
+
+---
+
+## 🔁 Workflow ที่ต้องทำทุกครั้ง
+
+**ก่อนเริ่ม edit:**
+1. `git status` — working tree clean?
+2. `grep -n "<keyword invariant>" <file>` — ยืนยัน feature ปัจจุบัน
+3. Read ไฟล์ที่จะแก้เต็ม ๆ ก่อน
+
+**หลัง edit:**
+1. `grep -n "<สิ่งที่เพิ่งเพิ่ม>" <file>` — ยืนยันโค้ดอยู่จริง
+2. `git diff <file>` — ดูว่าเปลี่ยนอะไร
+3. Re-check invariants list — ยังครบไหม?
+4. ถ้ามี docs ที่เกี่ยวข้อง → check sync
+
+**ก่อนตอบ user** รายงานแบบนี้:
+```
+✅ แก้แล้ว — verified:
+- grep เจอ <keyword> ที่ L.XX, YY
+- git diff แสดง +N -M บรรทัด
+- Invariants ครบทุกข้อ
+```
+
+---
+
+## 📝 Git Discipline
+
+- ไม่ push / commit ถ้าไม่ได้รับอนุญาต
+- ถ้า user ถามว่า "แก้แล้วใช่ไหม" → ตอบด้วย `git log` / `git diff` จริง ไม่ใช่จากความจำ
+- Commit message: อธิบายว่าเพิ่ม/แก้อะไร ไม่ใช่แค่ "update simulation.js"
+- ถ้าจะลบ feature → commit แยกจากการเพิ่ม feature เพื่อให้ revert ง่าย
+
+---
+
+## ❌ / ✅ Examples
+
+**❌ ห้ามทำ:**
+```
+"ผมได้แก้ rebalance logic เสร็จแล้วครับ"
+   (ไม่มี evidence ไม่ได้ verify — ต้อง grep และ git diff ก่อนพูด)
+
+"น่าจะแก้ได้แล้ว ลองรันดูครับ"
+   (เดา ไม่ได้ตรวจ)
+
+Rewrite ทั้งไฟล์เพื่อ "clean up" โดยไม่ถาม
+   (เสี่ยง regression)
+
+Update README ก่อน implement โค้ด
+   (ทำให้ docs ไม่ตรงกับความจริง)
+```
+
+**✅ ทำแบบนี้:**
+```
+"เพิ่ม Cholesky แล้วครับ — grep เจอ choleskyDecompose ที่ L.72,
+ ใช้งานใน runScenario L.168. Invariants ครบทุกข้อ
+ git diff: +48 -12"
+
+"ก่อนแก้ ขอเช็คก่อน: grep เจอ bidRatio 5 จุด, offerRatio 4 จุด
+ จะเริ่มแก้ส่วน rebalance ตามที่สั่ง"
+
+"ไฟล์นี้มี 273 บรรทัด ผมขอ edit เฉพาะฟังก์ชัน rebalance (L.98-120)
+ ไม่แตะส่วนอื่น ตกลงไหมครับ?"
+```
+
+---
+
+## 🆘 เมื่อไม่แน่ใจ
+
+- ถามก่อน ดีกว่า assume
+- แจ้ง trade-off ก่อนตัดสินใจแทน user
+- ถ้า edit fail → บอกตรง ๆ อย่าพยายามกลบเกลื่อน
+- ถ้าเจอ regression จากรอบก่อน → แจ้งและเสนอให้ revert
+
+> **หลักคิด:** user เสียเวลากับการ debug "โค้ดที่อ้างว่าเขียนแต่ไม่มีจริง" มากกว่าการรอ Claude ตรวจสอบให้แน่ใจ 10 วินาที

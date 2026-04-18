@@ -827,115 +827,53 @@ function renderOutcomeSummary() {
   const el = document.getElementById('resultSummaryPanel');
   if (!el) return;
 
-  const { percentiles, months, meanSeries } = state.results;
-  const totalPaid = simTotalPremium();
-  const step      = simPaymentStep();
+  const { percentiles, months } = state.results;
+  const step = simPaymentStep();
 
-  // Guard: meanSeries may be absent if simulation.js was cached before mean was added.
-  // In that case fall back to the P75 value as a rough proxy and show a warning.
-  const hasMean   = Array.isArray(meanSeries) && meanSeries.length === months;
-  const meanFinal = hasMean ? meanSeries[months - 1] : null;
-  const p50Final  = percentiles[50][months - 1];
-  const p25Final  = percentiles[25][months - 1];
+  const p75Final = percentiles[75][months - 1];
+  const p50Final = percentiles[50][months - 1];
+  const p25Final = percentiles[25][months - 1];
 
-  const meanIRR = hasMean ? calcIRR(state.premium, step, months, meanFinal) : null;
-  const p50IRR  = calcIRR(state.premium, step, months, p50Final);
-  const p25IRR  = calcIRR(state.premium, step, months, p25Final);
+  const p75IRR = calcIRR(state.premium, step, months, p75Final);
+  const p50IRR = calcIRR(state.premium, step, months, p50Final);
+  const p25IRR = calcIRR(state.premium, step, months, p25Final);
 
-  // Positive/negative class for IRR display
   function irrCls(irr) { return irr === null ? '' : irr >= 0 ? 'positive' : 'negative'; }
-
-  // The gap between mean and median (mean > median for a right-skewed distribution)
-  const gap        = hasMean ? (meanFinal - p50Final) : null;
-  const gapPct     = (hasMean && totalPaid > 0) ? (gap / totalPaid * 100) : null;
-  // Relative gap vs median — drives insight tone
-  const relGapPct  = (hasMean && p50Final > 0) ? ((meanFinal - p50Final) / p50Final * 100) : null;
-
-  function mmcInsight(relGap) {
-    if (relGap === null) return '';
-    if (relGap < 5)
-      return 'ค่าเฉลี่ยอาจสูงกว่าเล็กน้อย'
-           + ' แต่ผลลัพธ์ที่คนส่วนใหญ่จะเจอคือ <strong>ผลลัพธ์ทั่วไป</strong>'
-           + ' — ควรใช้ค่านี้ในการวางแผน';
-    if (relGap < 20)
-      return 'ค่าเฉลี่ยถูกดึงสูงขึ้นจากบางกรณีที่ได้ผลดีมาก'
-           + ' ผลลัพธ์ที่คุณมีโอกาสได้รับจริงใกล้เคียงกับ <strong>ผลลัพธ์ทั่วไป</strong>'
-           + ' มากกว่า — ใช้ตัวเลขนี้เป็นเกณฑ์หลักในการวางแผน';
-    return 'ค่าเฉลี่ยสูงกว่าผลลัพธ์จริงที่คนส่วนใหญ่จะได้รับ'
-         + ' เพราะถูกดึงขึ้นโดยกรณีที่ดีที่สุดเพียงไม่กี่กรณี'
-         + ' — <strong>ผลลัพธ์ทั่วไป</strong>สะท้อนสิ่งที่คุณควรใช้วางแผนจริงๆ';
-  }
-
-  // Average column — show placeholder when meanSeries is unavailable
-  const avgColHTML = hasMean ? `
-        <div class="outcome-col">
-          <span class="outcome-badge avg">ค่าเฉลี่ย (Average)</span>
-          <div class="outcome-value">${fmtTHB(meanFinal)}</div>
-          <div class="outcome-irr ${irrCls(meanIRR)}">IRR: ${fmtIRR(meanIRR)}</div>
-          <div class="outcome-desc">
-            อาจถูกดึงขึ้นจากบางกรณีที่ได้ผลดีมาก<br>
-            ไม่ใช่สิ่งที่ทุกคนจะได้รับ
-          </div>
-        </div>` : `
-        <div class="outcome-col" style="opacity:.45">
-          <span class="outcome-badge avg">ค่าเฉลี่ย (Average)</span>
-          <div class="outcome-value" style="font-size:16px;color:var(--gray-400)">—</div>
-          <div class="outcome-desc" style="font-size:12px">
-            รีเฟรชหน้าเว็บแล้วรัน<br>
-            เพื่อดูค่าเฉลี่ย
-          </div>
-        </div>`;
-
-  // Mean vs Median comparison block — hide when mean unavailable
-  const compareHTML = hasMean ? `
-      <div class="mean-median-note">
-        <div class="mean-median-compare">
-          <span class="mmc-label">ค่าเฉลี่ย</span>
-          <span class="mmc-val">${fmtTHB(meanFinal)}</span>
-          <span class="mmc-sep" style="color:var(--gray-300);padding:0 4px">vs</span>
-          <span class="mmc-label">ผลลัพธ์ทั่วไป</span>
-          <span class="mmc-val">${fmtTHB(p50Final)}</span>
-          <span class="mmc-sep" style="color:var(--gray-300);padding:0 4px">→</span>
-          <span class="mmc-diff-label">ค่าเฉลี่ยสูงกว่าประมาณ</span>
-          <span class="mmc-diff ${gap >= 0 ? 'positive' : 'negative'}">
-            ${fmtTHB(Math.abs(gap))} (${Math.abs(gapPct).toFixed(1)}%)
-          </span>
-        </div>
-        <p class="mmc-explanation">ℹ️ ${mmcInsight(relGapPct)}</p>
-      </div>` : '';
 
   el.innerHTML = `
     <div class="card">
       <div class="card-title"><span class="icon">📊</span> สรุปผลลัพธ์</div>
 
-      <!-- ── 3-column outcome grid ── -->
       <div class="outcome-grid">
-        ${avgColHTML}
-
-        <!-- Typical / Median — highlighted as most decision-relevant -->
-        <div class="outcome-col outcome-col--highlight">
-          <span class="outcome-badge med">ผลลัพธ์ทั่วไป (Most Likely)</span>
-          <div class="outcome-value">${fmtTHB(p50Final)}</div>
-          <div class="outcome-irr ${irrCls(p50IRR)}">IRR: ${fmtIRR(p50IRR)}</div>
-          <div class="outcome-desc">
-            มีโอกาส 50% ได้มากกว่านี้<br>
-            และ 50% ได้น้อยกว่านี้
-          </div>
+        <!-- P75 — Upside -->
+        <div class="outcome-col">
+          <span class="outcome-badge up">กรณีที่ดีกว่าปกติ (P75)</span>
+          <div class="outcome-value">${fmtTHB(p75Final)}</div>
+          <div class="outcome-irr ${irrCls(p75IRR)}">IRR: ${fmtIRR(p75IRR)}</div>
+          <div class="outcome-desc">มีโอกาส 1 ใน 4 ที่ผลลัพธ์จะสูงกว่านี้</div>
         </div>
 
-        <!-- Downside / P25 -->
+        <!-- P50 — Median, highlighted as planning anchor -->
+        <div class="outcome-col outcome-col--highlight">
+          <span class="outcome-badge med">ผลลัพธ์โดยทั่วไป (P50)</span>
+          <div class="outcome-value">${fmtTHB(p50Final)}</div>
+          <div class="outcome-irr ${irrCls(p50IRR)}">IRR: ${fmtIRR(p50IRR)}</div>
+          <div class="outcome-desc">ค่ากลางของผลลัพธ์ทั้งหมด ใช้เป็นตัววางแผน</div>
+        </div>
+
+        <!-- P25 — Downside -->
         <div class="outcome-col">
-          <span class="outcome-badge down">กรณีที่ควรเตรียมรับมือ</span>
+          <span class="outcome-badge down">กรณีที่ควรเตรียมรับมือ (P25)</span>
           <div class="outcome-value">${fmtTHB(p25Final)}</div>
           <div class="outcome-irr ${irrCls(p25IRR)}">IRR: ${fmtIRR(p25IRR)}</div>
-          <div class="outcome-desc">
-            มีโอกาส 1 ใน 4 ที่ผลลัพธ์อาจต่ำกว่านี้<br>
-            ควรเตรียมรับความผันผวนไว้ด้วย
-          </div>
+          <div class="outcome-desc">มีโอกาส 1 ใน 4 ที่ผลลัพธ์จะต่ำกว่านี้</div>
         </div>
       </div>
 
-      ${compareHTML}
+      <div class="planning-banner">
+        <span class="planning-banner-icon">ⓘ</span>
+        <span>กรอบการวางแผนที่สมเหตุสมผล: <strong>${fmtTHB(p25Final)}</strong> – <strong>${fmtTHB(p75Final)}</strong> ครอบคลุมสถานการณ์ส่วนใหญ่ที่อาจเกิดขึ้น</span>
+      </div>
     </div>
   `;
 }
