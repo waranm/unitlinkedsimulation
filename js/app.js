@@ -707,7 +707,6 @@ function buildResultsStep() {
     renderPercentileChart();      // normal percentile chart with mean overlay
   }
 
-  renderRiskFraming();      // probability statements
   buildSummaryTable();      // detailed table
 }
 
@@ -878,50 +877,6 @@ function renderOutcomeSummary() {
   `;
 }
 
-/**
- * Render the probability framing section below the chart.
- * Plain-language statements — no jargon, no "percentile".
- */
-function renderRiskFraming() {
-  const el = document.getElementById('resultRiskFraming');
-  if (!el) return;
-
-  const { percentiles, months } = state.results;
-  const p25 = percentiles[25][months - 1];
-  const p50 = percentiles[50][months - 1];
-  const p75 = percentiles[75][months - 1];
-
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-title"><span class="icon">🎯</span> โอกาสของผลลัพธ์</div>
-      <div class="risk-grid">
-
-        <div class="risk-item risk-up">
-          <div class="risk-pct">50%</div>
-          <div class="risk-direction">ผลลัพธ์ทั่วไป</div>
-          <div class="risk-phrase">มีโอกาส 50% ที่มูลค่าจะสูงกว่า</div>
-          <div class="risk-value">${fmtTHB(p50)}</div>
-        </div>
-
-        <div class="risk-item risk-down">
-          <div class="risk-pct">1 ใน 4</div>
-          <div class="risk-direction">ควรเตรียมรับมือ</div>
-          <div class="risk-phrase">มีโอกาส 1 ใน 4 ที่มูลค่าอาจต่ำกว่า</div>
-          <div class="risk-value">${fmtTHB(p25)}</div>
-        </div>
-
-        <div class="risk-item risk-up2">
-          <div class="risk-pct">1 ใน 4</div>
-          <div class="risk-direction">กรณีที่ดี</div>
-          <div class="risk-phrase">มีโอกาส 1 ใน 4 ที่มูลค่าจะเกิน</div>
-          <div class="risk-value">${fmtTHB(p75)}</div>
-        </div>
-
-      </div>
-    </div>
-  `;
-}
-
 function buildSummaryTable() {
   const { percentiles, months } = state.results;
   const tbody = document.querySelector('#summaryTable tbody');
@@ -933,10 +888,10 @@ function buildSummaryTable() {
 
   // Row label: plain language instead of "percentile N"
   const rowLabels = {
-    98: 'กรณีดีมาก (98%)',
-    75: 'กรณีดี (75%)',
-    50: 'ผลลัพธ์ทั่วไป (50%)',
-    25: 'กรณีที่ควรเตรียมรับมือ (25%)',
+    98: 'กรณีดีมาก (P98)',
+    75: 'กรณีที่ดีกว่าปกติ (P75)',
+    50: 'ผลลัพธ์โดยทั่วไป (P50)',
+    25: 'กรณีที่ควรเตรียมรับมือ (P25)',
   };
 
   for (const p of [98, 75, 50, 25]) {
