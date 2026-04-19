@@ -109,6 +109,31 @@ A single `state` object in `app.js` is the source of truth. All steps read/write
 - `runScenario(params)` → single path: simulate NAV month-by-month via Box-Muller normal, buy units on premium months, call `applyFees()` hook, optionally rebalance
 - `runMonteCarlo(config, onProgress)` → async; yields every 100 scenarios so the progress bar updates; returns `{ percentiles: {25,50,75,98}: number[], months }`
 
+### Run flow (app.js)
+
+Tool รัน simulation auto 4 rebalancing frequencies (none/monthly/quarterly/annual) ทุกครั้ง
+แล้วแนะนำตัวที่ดีสุดให้ user — user ไม่ต้องเลือก frequency เอง ยกเว้นกรณี single fund
+
+**Key state fields:**
+- `state.allResults` — object เก็บผล Monte Carlo ของแต่ละ frequency
+  - Multi-fund: `{ none, monthly, quarterly, annual }` — 4 keys
+  - Single fund: `{ none }` — 1 key เท่านั้น
+- `state.recommendedMode` — frequency ที่ tool แนะนำ (`'none'|'monthly'|'quarterly'|'annual'`)
+- `state.recommendConfidence` — `'high'|'low'|'n/a'`
+  - `'high'` — spread ≥ 1%, แสดง ⭐ แนะนำ badge
+  - `'low'` — spread < 1%, ซ่อน badge แต่ยัง highlight row
+  - `'n/a'` — single fund, ไม่มี recommendation concept
+- `state.recommendMessage` — copy text (อ่านเป็น display เท่านั้น ห้าม logic read)
+- `state.isSingleFund` — boolean, recompute ก่อน run ทุกครั้ง (ป้องกัน stale state)
+
+**Single-fund branch:** allocation 100% ในกองเดียวเป๊ะ → รัน 1 ครั้งเท่านั้น +
+ซ่อน section "เปรียบเทียบความถี่" + chart header แสดง "(ไม่มีการปรับสมดุล — กองทุนเดียว)"
+
+### Decision logic separation
+
+`recommendFrequency()` return `{mode, confidence, message}` — confidence เป็น enum แยกจาก message
+เพื่อให้ logic (badge conditional) แยกจาก copywriting เปลี่ยนข้อความได้โดยไม่กระทบ behavior
+
 ### Adding fees (v2 hook)
 `applyFees(portfolio, navPrices, feeParams, month)` in `simulation.js` is currently a no-op. Implement it there; pass fee config via `feeParams` in `runMonteCarlo()` → `runScenario()`. No other files need changing.
 
@@ -203,6 +228,26 @@ Update README ก่อน implement โค้ด
 "ไฟล์นี้มี 273 บรรทัด ผมขอ edit เฉพาะฟังก์ชัน rebalance (L.98-120)
  ไม่แตะส่วนอื่น ตกลงไหมครับ?"
 ```
+
+---
+
+## ⚠️ Common Pitfalls ที่เคยเจอ
+
+❌ **Hide-but-still-compute pattern** — `.style.display = 'none'` หรือ `display:none` ใน CSS
+ซ่อนแค่ visual rendering ไม่ได้ป้องกัน JS function ที่ populate section จาก execute
+
+ถ้า function นั้นอ่าน data structure ที่อาจไม่มี (เช่น loop ผ่าน keys ที่ assume ว่ามีครบ)
+จะ crash ด้วย "Cannot read properties of undefined"
+
+**Guard pattern ที่ถูก:** early return ใน function เอง ตาม state flag
+```js
+function renderRebalCompareInsight() {
+  if (state.isSingleFund) return;   // ← guard ก่อนเข้า logic
+  // ... existing code
+}
+```
+
+**อย่าพึ่งแค่ CSS display** — ถ้า function ถูก call ตรง ๆ (ไม่ผ่าน DOM event) CSS ไม่ช่วย
 
 ---
 
