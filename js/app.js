@@ -639,6 +639,7 @@ async function runSimulation() {
     state.allResults = allResults;
     const rec = recommendFrequency(allResults);
     state.recommendedMode    = rec.mode;
+    state.recommendConfidence = rec.confidence;
     state.recommendMessage   = rec.message;
     state.results            = allResults[rec.mode];
 
@@ -683,6 +684,12 @@ function buildResultsStep() {
   document.getElementById('rebalCompareInsight').style.display = '';
 
   renderOutcomeSummary();
+
+  const freqLabelMap = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
+  const freqLabel = freqLabelMap[state.recommendedMode] || 'รายไตรมาส';
+  const chartTitleEl = document.getElementById('chartSectionTitle');
+  if (chartTitleEl) chartTitleEl.innerHTML = `<span class="icon">📈</span> ผลการ Simulation — เส้นผลลัพธ์ (ใช้การปรับสมดุล${freqLabel})`;
+
   renderPercentileChart();
   renderRebalCompareInsight();
   buildSummaryTable();
@@ -721,7 +728,7 @@ function recommendFrequency(allResults) {
   const spread = minP50 > 0 ? (maxP50 - minP50) / minP50 : 0;
 
   if (spread < 0.01) {
-    return { mode: 'quarterly', message: 'ทุกความถี่ให้ผลใกล้เคียงกัน (<1% ต่างกัน) เลือกตามความสะดวก' };
+    return { mode: 'quarterly', confidence: 'low', message: 'ทุกความถี่ให้ผลใกล้เคียงกัน (<1% ต่างกัน) เลือกตามความสะดวก' };
   }
 
   const bestMode   = modes.find(m => p50s[m] === maxP50);
@@ -729,6 +736,7 @@ function recommendFrequency(allResults) {
   const diffVsNone = noneP50 > 0 ? ((maxP50 - noneP50) / noneP50 * 100) : 0;
   return {
     mode: bestMode,
+    confidence: 'high',
     message: `กลยุทธ์${nameMap[bestMode]}ให้ผลลัพธ์ทั่วไปสูงกว่า ${diffVsNone.toFixed(1)}% เมื่อเทียบกับไม่ปรับสมดุล`,
   };
 }
@@ -759,7 +767,7 @@ function renderRebalCompareInsight() {
     const isRec     = r.mode === recMode;
     const profitCls = r.profit >= 0 ? 'positive' : 'negative';
     const irrCls    = r.irr !== null && r.irr >= 0 ? 'positive' : 'negative';
-    const badge     = isRec ? `<span class="rc-badge rc-badge--best">⭐ แนะนำ</span>` : '';
+    const badge     = isRec && state.recommendConfidence === 'high' ? `<span class="rc-badge rc-badge--best">⭐ แนะนำ</span>` : '';
 
     return `
       <tr class="${isRec ? 'rc-row--best' : ''}">
@@ -819,7 +827,6 @@ function renderOutcomeSummary() {
   el.innerHTML = `
     <div class="card">
       <div class="card-title"><span class="icon">📊</span> สรุปผลลัพธ์</div>
-      <p class="rec-mode-note">💡 ตัวเลขนี้ใช้การปรับสมดุล: ${{ none:'ไม่ปรับสมดุล', monthly:'รายเดือน', quarterly:'รายไตรมาส', annual:'รายปี' }[state.recommendedMode] || '-'} (แนะนำ)</p>
 
       <div class="outcome-grid">
         <!-- P75 — Upside -->
