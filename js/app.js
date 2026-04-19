@@ -624,24 +624,41 @@ async function runSimulation() {
     ],
   };
 
+  const nonZeroFunds = Object.entries(state.allocation).filter(([, v]) => v > 0);
+  const isSingleFund = nonZeroFunds.length === 1 && nonZeroFunds[0][1] === 100;
+  state.isSingleFund = isSingleFund;
+
   try {
-    // Always run all 4 frequencies with a shared seed so variance is eliminated
-    // from the comparison — any difference reflects rebalancing only.
-    const seed  = Date.now();
-    const modes = ['none', 'monthly', 'quarterly', 'annual'];
+    const seed       = Date.now();
     const allResults = {};
-    for (let i = 0; i < modes.length; i++) {
-      allResults[modes[i]] = await runMonteCarlo(
-        { ...baseConfig, rebalanceMode: modes[i], seed },
-        pct => setProgress((i * 100 + pct) / modes.length)
+
+    if (isSingleFund) {
+      allResults['none'] = await runMonteCarlo(
+        { ...baseConfig, rebalanceMode: 'none', seed },
+        pct => setProgress(pct)
       );
+      state.allResults       = allResults;
+      state.recommendedMode  = 'none';
+      state.recommendConfidence = 'n/a';
+      state.recommendMessage = '';
+      state.results          = allResults['none'];
+    } else {
+      // Run all 4 frequencies with a shared seed so variance is eliminated
+      // from the comparison — any difference reflects rebalancing only.
+      const modes = ['none', 'monthly', 'quarterly', 'annual'];
+      for (let i = 0; i < modes.length; i++) {
+        allResults[modes[i]] = await runMonteCarlo(
+          { ...baseConfig, rebalanceMode: modes[i], seed },
+          pct => setProgress((i * 100 + pct) / modes.length)
+        );
+      }
+      state.allResults = allResults;
+      const rec = recommendFrequency(allResults);
+      state.recommendedMode     = rec.mode;
+      state.recommendConfidence = rec.confidence;
+      state.recommendMessage    = rec.message;
+      state.results             = allResults[rec.mode];
     }
-    state.allResults = allResults;
-    const rec = recommendFrequency(allResults);
-    state.recommendedMode    = rec.mode;
-    state.recommendConfidence = rec.confidence;
-    state.recommendMessage   = rec.message;
-    state.results            = allResults[rec.mode];
 
     buildResultsStep();
     goToStep(3);
@@ -681,14 +698,20 @@ function fmtIRR(irr) {
 
 function buildResultsStep() {
   document.querySelector('.pct-options').style.display         = '';
-  document.getElementById('rebalCompareInsight').style.display = '';
+  document.getElementById('rebalCompareInsight').style.display = state.isSingleFund ? 'none' : '';
 
   renderOutcomeSummary();
 
-  const freqLabelMap = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
-  const freqLabel = freqLabelMap[state.recommendedMode] || 'รายไตรมาส';
   const chartTitleEl = document.getElementById('chartSectionTitle');
-  if (chartTitleEl) chartTitleEl.innerHTML = `<span class="icon">📈</span> ผลการ Simulation — เส้นผลลัพธ์ (ใช้การปรับสมดุล${freqLabel})`;
+  if (chartTitleEl) {
+    if (state.isSingleFund) {
+      chartTitleEl.innerHTML = `<span class="icon">📈</span> ผลการ Simulation — เส้นผลลัพธ์ <span style="color:var(--gray-500)">(ไม่มีการปรับสมดุล — กองทุนเดียว)</span>`;
+    } else {
+      const freqLabelMap = { none: 'ไม่ปรับสมดุล', monthly: 'รายเดือน', quarterly: 'รายไตรมาส', annual: 'รายปี' };
+      const freqLabel = freqLabelMap[state.recommendedMode] || 'รายไตรมาส';
+      chartTitleEl.innerHTML = `<span class="icon">📈</span> ผลการ Simulation — เส้นผลลัพธ์ (ใช้การปรับสมดุล${freqLabel})`;
+    }
+  }
 
   renderPercentileChart();
   renderRebalCompareInsight();
@@ -743,6 +766,7 @@ function recommendFrequency(allResults) {
 
 /** Generate the compare-rebalance insight card with side-by-side table + insight text. */
 function renderRebalCompareInsight() {
+  if (state.isSingleFund) return;
   const el = document.getElementById('rebalCompareInsight');
   if (!el || !state.allResults) return;
 
