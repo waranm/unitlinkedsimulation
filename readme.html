@@ -722,22 +722,62 @@
   <div class="fix-card" id="rebalance">
     <div class="fix-header">
       <div>
-        <div class="fix-title">Rebalancing — การปรับสมดุลพอร์ต</div>
-        <div class="fix-file">simulation.js · rebalance()</div>
+        <div class="fix-title">Rebalancing — การปรับสมดุลพอร์ต (Delta Rebalancing)</div>
+        <div class="fix-file">simulation.js · rebalance() · L.445</div>
       </div>
       <span class="badge badge-eng">Portfolio</span>
     </div>
     <div class="fix-body">
 
-      <div class="fix-section-label">กลไก</div>
+      <div class="fix-section-label">กลไก — Delta Rebalancing</div>
       <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
         Rebalancing เกิดขึ้น <em>หลังจาก</em> fee deduction และ premium contribution
         ในแต่ละเดือนที่กำหนด (monthly, quarterly, annual)
       </p>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        การ rebalance <strong>ไม่ได้ขายทุกกองทุนแล้วซื้อใหม่ทั้งหมด</strong>
+        แต่ใช้วิธี <strong>Delta Rebalancing</strong> — ซื้อหรือขายเฉพาะ<em>ส่วนที่ต้องปรับ</em>ในแต่ละกอง:
+      </p>
       <div class="math-box">
-        1. ประเมินมูลค่าพอร์ตรวมที่ BID price<br>
-        2. Re-allocate: ซื้อทุกกองทุนใหม่ที่ Offer price ตาม target allocation<br><br>
-        ผลสุทธิ: มูลค่ารวมเท่าเดิม แต่สัดส่วนกลับมาตรง target
+        1. ประเมินมูลค่าแต่ละกองที่ BID price → คำนวณ total<br>
+        2. คำนวณ delta = targetValue − currentValue ต่อกอง<br>
+        &nbsp;&nbsp;&nbsp;• delta &lt; 0 → กอง overweight: ขายส่วนเกินที่ <strong>BID price</strong><br>
+        &nbsp;&nbsp;&nbsp;• delta &gt; 0 → กอง underweight: ซื้อส่วนขาดที่ <strong>Offer price</strong><br>
+        &nbsp;&nbsp;&nbsp;• |delta| ≈ 0 → กองที่ตรง target: ไม่มี transaction<br><br>
+        ผลสุทธิ: สัดส่วนกลับมาตรง target โดยจ่าย spread เฉพาะ delta เท่านั้น
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">ตัวอย่าง Concrete (3 กองทุน)</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        Portfolio หลัง market move / target 33%/33%/34%:
+      </p>
+      <pre><code><span class="cmt">// Fund A: 100 units × bid 1.19 = 119.00  (overweight)</span>
+<span class="cmt">// Fund B: 100 units × bid 0.99 =  99.00  (underweight)</span>
+<span class="cmt">// Fund C: 100 units × bid 1.09 = 109.00  (underweight)</span>
+<span class="cmt">// total = 327.00</span>
+
+<span class="cmt">// targetA = 327×0.33 = 107.91  → delta = −11.09 → sell 9.32 units ที่ bid 1.19</span>
+<span class="cmt">// targetB = 327×0.33 = 107.91  → delta = +8.91  → buy  8.82 units ที่ offer 1.01</span>
+<span class="cmt">// targetC = 327×0.34 = 111.18  → delta = +2.18  → buy  1.96 units ที่ offer 1.11</span>
+
+<span class="cmt">// Fund A ขายแค่ 9.32 units (จาก 100) — ไม่ได้ขายทั้งหมด</span></code></pre>
+
+      <div class="fix-section-label" style="margin-top:16px">ทำไม Delta — ไม่ใช่ Sell-All-Buy-All</div>
+      <div class="two-col">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#15803d;margin-bottom:6px">Delta Rebalancing (current)</div>
+          Spread cost ตกบน <strong>เฉพาะส่วนที่ trade</strong><br><br>
+          กองที่ overweight: ขายส่วนเกินที่ BID<br>
+          กองที่ underweight: ซื้อส่วนขาดที่ Offer<br>
+          กองที่ on-target: ไม่แตะ → ไม่เสีย spread
+        </div>
+        <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#854d0e;margin-bottom:6px">Naive Sell-All-Buy-All (ไม่ใช้)</div>
+          Spread cost ตกบน <strong>ทั้ง portfolio</strong><br><br>
+          ขายทุกกองที่ BID → เงินสด<br>
+          ซื้อใหม่ทุกกองที่ Offer<br>
+          จ่าย spread ซ้ำแม้กองที่ไม่ต้องปรับ
+        </div>
       </div>
 
       <div class="fix-section-label" style="margin-top:16px">Rebalancing Schedules</div>
@@ -750,9 +790,16 @@
       <div class="warn-box">
         <span style="font-size:16px;flex-shrink:0">⚠️</span>
         <div>
-          Rebalancing ใช้ <strong>Offer price สำหรับซื้อ</strong> และ <strong>BID price สำหรับขาย</strong>
-          ทำให้มี bid-ask spread cost แต่ละครั้งที่ rebalance
-          ยิ่ง rebalance บ่อย ยิ่งสูญเสีย spread มากกว่า
+          แม้จะเป็น delta rebalancing แต่ยังมี bid-ask spread cost ทุกครั้งที่ rebalance
+          เพราะส่วนที่ขาย (overweight) ถูกขายที่ BID และส่วนที่ซื้อ (underweight) ถูกซื้อที่ Offer
+          ยิ่ง rebalance บ่อย ยิ่งสะสม spread มากขึ้น
+        </div>
+      </div>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>Single-fund portfolio:</strong> delta ทุกกองเป็น 0 ตลอด (allocation ตรง 100% อยู่แล้ว) → rebalance เป็น no-op สมบูรณ์ ไม่มี spread cost ใดๆ
         </div>
       </div>
     </div>
