@@ -64,7 +64,31 @@ def read_xls(path):
 def read_xlsx(path):
     wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
     ws = wb.active
-    return [[cell.value for cell in row] for row in ws.iter_rows()]
+    raw = [[cell.value for cell in row] for row in ws.iter_rows()]
+    if not raw:
+        return raw
+    # Detect header row with known column names and remap to (fund, date, nav, offer, bid)
+    first = [str(v).strip().upper() if v is not None else '' for v in raw[0]]
+    col_map = {name: i for i, name in enumerate(first)}
+    known_headers = {'FUND_NAME', 'EFF_DT', 'UNIT_BARE_PRICE', 'UNIT_BID_PRICE', 'UNIT_OFFER_PRICE'}
+    if known_headers & set(col_map):
+        idx_fund  = col_map.get('FUND_NAME', 0)
+        idx_date  = col_map.get('EFF_DT', 1)
+        idx_nav   = col_map.get('UNIT_BARE_PRICE', 2)
+        idx_offer = col_map.get('UNIT_OFFER_PRICE', 4)
+        idx_bid   = col_map.get('UNIT_BID_PRICE', 3)
+        result = []
+        for row in raw[1:]:  # skip header
+            if len(row) > max(idx_fund, idx_date, idx_nav):
+                result.append([
+                    row[idx_fund],
+                    row[idx_date],
+                    row[idx_nav],
+                    row[idx_offer] if len(row) > idx_offer else None,
+                    row[idx_bid]   if len(row) > idx_bid   else None,
+                ])
+        return result
+    return raw
 
 
 def parse_rows(raw_rows):

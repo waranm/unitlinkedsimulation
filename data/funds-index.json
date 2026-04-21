@@ -1,11 +1,451 @@
 [
   {
+    "name": "กองทุนเปิด ttb smart port1 preserver(tsp1-preserver)",
+    "file": "ttb-smart-port1-preservertsp1-preserver.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 718,
+    "latestNAV": 10.0975
+  },
+  {
+    "name": "กองทุนเปิด ttb smart port2 nurturer(tsp2-nurturer)",
+    "file": "ttb-smart-port2-nurturertsp2-nurturer.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 691,
+    "latestNAV": 10.4342
+  },
+  {
+    "name": "กองทุนเปิด ttb smart port3 balancer(tsp3-balancer)",
+    "file": "ttb-smart-port3-balancertsp3-balancer.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 691,
+    "latestNAV": 11.3384
+  },
+  {
+    "name": "กองทุนเปิด ttb smart port4 explorer(tsp4-explorer)",
+    "file": "ttb-smart-port4-explorertsp4-explorer.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 691,
+    "latestNAV": 11.1722
+  },
+  {
+    "name": "กองทุนเปิด ttb smart port5 go-getter(tsp5-gogetter)",
+    "file": "ttb-smart-port5-go-gettertsp5-gogetter.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 717,
+    "latestNAV": 11.2343
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ Mid/Small Cap อิควิตี้ ชนิดหน่วยลงทุน A(TISCOMS-A)",
+    "file": "MidSmall-Cap-ATISCOMS-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 11.4282
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ พันธบัตรระยะสั้น(TISCOSTF)",
+    "file": "TISCOSTF.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 13.6364
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ ยุโรป อิควิตี้ ชนิดผู้ลงทุนทั่วไป(TISCOEU-A)",
+    "file": "TISCOEU-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 19.5969
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ ยูเอส อิควิตี้ ฟันด์ ชนิดผู้ลงทุนทั่วไป(TISCOUS-A)",
+    "file": "TISCOUS-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 51.882
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ อินคัมพลัส ชนิดสะสมมูลค่า(TINC-A)",
+    "file": "TINC-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 12.1562
+  },
+  {
+    "name": "กองทุนเปิด ทิสโก้ ไชน่า H-Shares อิควิตี้(TISCOCH)",
+    "file": "H-Shares-TISCOCH.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 6.94
+  },
+  {
+    "name": "กองทุนเปิด ยูโอบี สมาร์ท มิเลนเนียม โกรว์ธ(UOBSMG)",
+    "file": "UOBSMG.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 66.8981
+  },
+  {
+    "name": "กองทุนเปิด ยูโอบี สมาร์ท โกลบอล เฮลท์แคร์ ฟันด์(UOBSHC)",
+    "file": "UOBSHC.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 745,
+    "latestNAV": 14.1782
+  },
+  {
+    "name": "กองทุนเปิด ยูโอบีสมาร์ทเจแปนสมอลแอนด์มิดแคปฟันด์(UOBSJSM)",
+    "file": "UOBSJSM.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 732,
+    "latestNAV": 30.7146
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ซัสเทนเนเบิล อิควิตี้ โซลูชั่น ฟันด์(USUS)",
+    "file": "USUS.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 716,
+    "latestNAV": 10.8118
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ซีไอโอ อินคัม ฟันด์ TH - หน่วยลงทุนชนิดรับซื้อคืนหน่วยลงทุนแบบปกติ(UIFT-N)",
+    "file": "TH---UIFT-N.json",
+    "firstDate": "2023-08-03",
+    "lastDate": "2026-03-23",
+    "count": 613,
+    "latestNAV": 11.4777
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ซีไอโอ โกรท ฟันด์ TH - หน่วยลงทุนชนิดเพื่อผู้ลงทุนทั่วไป(UGFT)",
+    "file": "TH---UGFT.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 771,
+    "latestNAV": 9.3922
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด สมาร์ท เครดิต อินคัม ฟันด์(USI)",
+    "file": "USI.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 733,
+    "latestNAV": 9.7019
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ออล ไชน่า อิควิตี้ ฟันด์(UCHINA)",
+    "file": "UCHINA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 680,
+    "latestNAV": 7.2493
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด อินคัม เดลี่ อัลตร้า พลัส(UIDPLUS)",
+    "file": "UIDPLUS.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 10.7752
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด อีเมอร์จิ้ง มาร์เก็ต อินคัม(UEMIF-N)",
+    "file": "UEMIF-N.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 743,
+    "latestNAV": 11.9036
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ฮาร์โมนี-ป๊อป ฟันด์(UPOP)",
+    "file": "UPOP.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-19",
+    "count": 622,
+    "latestNAV": 10.4503
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ฮาร์โมนี-ร็อค ฟันด์(UROCK)",
+    "file": "UROCK.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-19",
+    "count": 622,
+    "latestNAV": 11.3367
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด ฮาร์โมนี-แจ๊ส ฟันด์(UJAZZ)",
+    "file": "UJAZZ.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-19",
+    "count": 622,
+    "latestNAV": 10.0131
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด เฟล็กซิเบิ้ล อินคัม ฟันด์(UFIN-N)",
+    "file": "UFIN-N.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 718,
+    "latestNAV": 10.4966
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล ควอลิตี้ โกรท ฟันด์ - หน่วยลงทุนชนิดเพื่อผู้ลงทุนทั่วไป(UGQG)",
+    "file": "UGQG.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 739,
+    "latestNAV": 11.5273
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล ดูเรเบิ้ล อิควิตี้ ฟันด์(UGD)",
+    "file": "UGD.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 745,
+    "latestNAV": 14.2619
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล บาลานซ์ ฟันด์(UGBF-N)",
+    "file": "UGBF-N.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 710,
+    "latestNAV": 11.3158
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล อินคัม สตราทีจิค บอนด์(UGIS-N)",
+    "file": "UGIS-N.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 754,
+    "latestNAV": 11.6324
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล อินโนเวชั่น ฟันด์(UNI)",
+    "file": "UNI.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 739,
+    "latestNAV": 15.1424
+  },
+  {
+    "name": "กองทุนเปิด ยูไนเต็ด โกลบอล ไดนามิค บอนด์(UDB-N)",
+    "file": "UDB-N.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 759,
+    "latestNAV": 10.0268
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน สมอล-มิดแค็พ(ABSM)",
+    "file": "ABSM.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 37.0502
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน อินเดีย โกรท ฟันด์(ABIG)",
+    "file": "ABIG.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 728,
+    "latestNAV": 19.3088
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน เอเชีย แปซิฟิค เอคควิตี้ ฟันด์(ABAPAC)",
+    "file": "ABAPAC.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 759,
+    "latestNAV": 22.0084
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน แคช ครีเอชั่น(ABCC)",
+    "file": "ABCC.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 18.7777
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน แวลู(ABV)",
+    "file": "ABV.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 32.947
+  },
+  {
+    "name": "กองทุนเปิด อเบอร์ดีน โกรท(ABG)",
+    "file": "ABG.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 85.0788
+  },
+  {
+    "name": "กองทุนเปิด ไทย บาลานซ์ฟันด์(TBF)",
+    "file": "TBF.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 8.8609
+  },
+  {
+    "name": "กองทุนเปิดกรุงศรีคอลเล็คทีฟโกลบอลอินคัม-สะสมมูลค่า(KF-CINCOME-A)",
+    "file": "KF-CINCOME-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 799,
+    "latestNAV": 12.2973
+  },
+  {
+    "name": "กองทุนเปิดกรุงศรีเกรทเทอร์ไชน่าอิควิตี้เฮดจ์ปันผล(KF-GCHINAD)",
+    "file": "KF-GCHINAD.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 799,
+    "latestNAV": 5.7923
+  },
+  {
+    "name": "กองทุนเปิดกรุงศรีเจแปนเฮดจ์ปันผล(KF-HJAPAND)",
+    "file": "KF-HJAPAND.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 799,
+    "latestNAV": 11.3378
+  },
+  {
+    "name": "กองทุนเปิดกรุงศรีแอคทีฟตราสารหนี้(KFAFIX-A)",
+    "file": "KFAFIX-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 12.2055
+  },
+  {
+    "name": "กองทุนเปิดกรุงศรีโกลบอลเฮลธ์แคร์อิควิตี้-ปันผล(KFHEALTH-D)",
+    "file": "KFHEALTH-D.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 799,
+    "latestNAV": 7.2921
+  },
+  {
+    "name": "กองทุนเปิดทิสโก้ สแตรทิจิก ฟันด์ ชนิดหน่วยลงทุน A(TSF-A)",
+    "file": "ATSF-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 56.1464
+  },
+  {
+    "name": "กองทุนเปิดทิสโก้โกลบอลอินคัมพลัส ชนิดสะสมผลตอบแทน(TGINC-A)",
+    "file": "TGINC-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 12.7925
+  },
+  {
+    "name": "กองทุนเปิดพรินซิเพิล คอร์ ฟิกซ์ อินคัม-ชนิดผู้ลงทุนกลุ่ม(PRINCIPAL iFIXED-C)",
+    "file": "PRINCIPAL-iFIXED-C.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 13.4116
+  },
+  {
+    "name": "กองทุนเปิดพรินซิเพิล โกลบอล ซิลเวอร์ เอจ(PRINCIPAL GSA)",
+    "file": "PRINCIPAL-GSA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 733,
+    "latestNAV": 11.4066
+  },
+  {
+    "name": "กองทุนเปิดอิสท์สปริง Ultimate Global Allocation 1(ES-ULTIMATE GA1)",
+    "file": "Ultimate-Global-Allocation-1ES-ULTIMATE-GA1.json",
+    "firstDate": "2025-02-06",
+    "lastDate": "2026-03-23",
+    "count": 237,
+    "latestNAV": 10.8779
+  },
+  {
+    "name": "กองทุนเปิดอิสท์สปริง Ultimate Global Allocation 2(ES-ULTIMATE GA2)",
+    "file": "Ultimate-Global-Allocation-2ES-ULTIMATE-GA2.json",
+    "firstDate": "2025-02-06",
+    "lastDate": "2026-03-23",
+    "count": 237,
+    "latestNAV": 11.4552
+  },
+  {
+    "name": "กองทุนเปิดอิสท์สปริง Ultimate Global Allocation 3(ES-ULTIMATE GA3)",
+    "file": "Ultimate-Global-Allocation-3ES-ULTIMATE-GA3.json",
+    "firstDate": "2025-02-06",
+    "lastDate": "2026-03-23",
+    "count": 237,
+    "latestNAV": 11.4976
+  },
+  {
     "name": "กองทุนเปิดอีสท์สปริง Asia Active Equity (ชนิดสะสมมูลค่า) (ES-ASIA-A)",
     "file": "Asia-Active-Equity-ES-ASIA-A.json",
     "firstDate": "2022-01-04",
     "lastDate": "2025-12-30",
     "count": 891,
     "latestNAV": 15.8016
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Asia Active Equity สะสมมูลค่า(ES-ASIA-A)",
+    "file": "Asia-Active-Equity-ES-ASIA-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 734,
+    "latestNAV": 16.2408
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง China Opportunity(ES-COF)",
+    "file": "China-OpportunityES-COF.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 690,
+    "latestNAV": 12.69
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง GIS Global Bond(ES-GF-A)",
+    "file": "GIS-Global-BondES-GF-A.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 761,
+    "latestNAV": 12.1031
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Global Core Equity(ES-GCORE)",
+    "file": "Global-Core-EquityES-GCORE.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 743,
+    "latestNAV": 17.3831
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Global Dividend Equity สะสมมูลค่า(ES-GDIV-Acc)",
+    "file": "Global-Dividend-Equity-ES-GDIV-Acc.json",
+    "firstDate": "2023-06-27",
+    "lastDate": "2026-03-23",
+    "count": 629,
+    "latestNAV": 11.8412
   },
   {
     "name": "กองทุนเปิดอีสท์สปริง Global Quality Growth (ES-GQG)",
@@ -16,11 +456,243 @@
     "latestNAV": 23.9369
   },
   {
+    "name": "กองทุนเปิดอีสท์สปริง Global Quality Growth(ES-GQG)",
+    "file": "Global-Quality-GrowthES-GQG.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 754,
+    "latestNAV": 22.4259
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Global Technology(ES-GTECH)",
+    "file": "Global-TechnologyES-GTECH.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 727,
+    "latestNAV": 26.1817
+  },
+  {
     "name": "กองทุนเปิดอีสท์สปริง Income Plus (ES-IPLUS)",
     "file": "Income-Plus-ES-IPLUS.json",
     "firstDate": "2022-01-04",
     "lastDate": "2025-12-30",
     "count": 952,
     "latestNAV": 12.3305
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Income Plus(ES-IPLUS)",
+    "file": "Income-PlusES-IPLUS.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 12.3523
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Low Beta(ES-LOWBETA)",
+    "file": "Low-BetaES-LOWBETA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 17.5307
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง Property and Infrastructure Income Plus Flexible(ES-PIPF)",
+    "file": "Property-and-Infrastructure-Income-Plus-FlexibleES-PIPF.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 8.4948
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง US Information Technology(ES-USTECH)",
+    "file": "US-Information-TechnologyES-USTECH.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 755,
+    "latestNAV": 18.7977
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง ธนรัฐ(ES-TM)",
+    "file": "ES-TM.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 14.6421
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง บริหารเงิน(ES-CASH)",
+    "file": "ES-CASH.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 14.4902
+  },
+  {
+    "name": "กองทุนเปิดอีสท์สปริง เสถียรทรัพย์ปันผล(ES-STSD)",
+    "file": "ES-STSD.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 9.2404
+  },
+  {
+    "name": "กองทุนเปิดเคเคพี CorePath Balanced ชนิดทั่วไป(KKP CorePath Balanced)",
+    "file": "CorePath-Balanced-KKP-CorePath-Balanced.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-19",
+    "count": 742,
+    "latestNAV": 16.8492
+  },
+  {
+    "name": "กองทุนเปิดเคเคพี แอ็กทิฟ อิควิตี้ชนิดจ่ายเงินปันผล(KKP ACT EQ-D)",
+    "file": "KKP-ACT-EQ-D.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 800,
+    "latestNAV": 13.5425
+  },
+  {
+    "name": "ไทยพาณิชย์ Global Sus Population Trend(สะสมมูลค่า)(SCBPOPA)",
+    "file": "Global-Sus-Population-TrendSCBPOPA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 13.1387
+  },
+  {
+    "name": "ไทยพาณิชย์ SET BANKING SECTOR INDEX (สะสมมูลค่า)(SCBBANKINGA)",
+    "file": "SET-BANKING-SECTOR-INDEX-SCBBANKINGA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 15.8896
+  },
+  {
+    "name": "ไทยพาณิชย์ หุ้น LOW VOLATILITY (สะสมมูลค่า)(SCBLEQA)",
+    "file": "LOW-VOLATILITY-SCBLEQA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 16.6841
+  },
+  {
+    "name": "ไทยพาณิชย์ เครดิต ออพพอทูนิตี้ (ชนิดสะสมมูลค่า)(SCBOPPA)",
+    "file": "SCBOPPA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 10.5151
+  },
+  {
+    "name": "ไทยพาณิชย์ โกลบอล ฟิกซ์ อินคัม (ชนิดสะสมมูลค่า)(SCBFINA)",
+    "file": "SCBFINA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 10.0822
+  },
+  {
+    "name": "ไทยพาณิชย์ โกลบอลดิจิตอล(SCBDIGI)",
+    "file": "SCBDIGI.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 20.6063
+  },
+  {
+    "name": "ไทยพาณิชย์ โกลบอลสตราทีจิก อินเวสเมนท์(สะสมมูลค่า)(SCBGSIF)",
+    "file": "SCBGSIF.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 11.9513
+  },
+  {
+    "name": "ไทยพาณิชย์ซีเล็คท์อิควิตี้ฟันด์(ชนิดสะสมมูลค่า)(SCBSEA)",
+    "file": "SCBSEA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 11.954
+  },
+  {
+    "name": "ไทยพาณิชย์ตราสารหนี้ระยะสั้นพลัส-ชนิดหน่วยลงทุน I(SCBSFFPLUS-I)",
+    "file": "ISCBSFFPLUS-I.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 11.857
+  },
+  {
+    "name": "ไทยพาณิชย์หุ้นทุนMid/Small Cap (ชนิดสะสมมูลค่า)(SCBMSE)",
+    "file": "MidSmall-Cap-SCBMSE.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 10.1142
+  },
+  {
+    "name": "ไทยพาณิชย์หุ้นยุโรปสมอลแคป (ชนิดสะสมมูลค่า)(SCBEUSM)",
+    "file": "SCBEUSM.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 14.0456
+  },
+  {
+    "name": "ไทยพาณิชย์เวิลด์อินคัม(ชนิดสะสมมูลค่า)(SCBWINA)",
+    "file": "SCBWINA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 11.579
+  },
+  {
+    "name": "ไทยพาณิชย์เอเชียนอีเมอร์จิ้งมาร์เก็ตTHBเฮดจ์(สะสม)(SCBAEMHA)",
+    "file": "THBSCBAEMHA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 10.0568
+  },
+  {
+    "name": "ไทยพาณิชย์เอเชียแปซิฟิคอินคัมพลัส(ชนิดสะสมมูลค่า)(SCBAPLUSA)",
+    "file": "SCBAPLUSA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 12.5627
+  },
+  {
+    "name": "ไทยพาณิชย์โกลด์ THB เฮดจ์ (ชนิดสะสมมูลค่า)(SCBGOLDH)",
+    "file": "THB-SCBGOLDH.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-24",
+    "count": 801,
+    "latestNAV": 19.8034
+  },
+  {
+    "name": "ไทยพาณิชย์โกลบอลอิควิตี้ (ชนิดสะสมมูลค่า)(SCBGEQA)",
+    "file": "SCBGEQA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 17.6942
+  },
+  {
+    "name": "ไทยพาณิชย์โกลบอลอินคัม(ชนิดสะสมมูลค่า)(SCBGINA)",
+    "file": "SCBGINA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-23",
+    "count": 800,
+    "latestNAV": 11.6252
+  },
+  {
+    "name": "ไทยพาณิชย์โกลบอลโรโบติกส์(ชนิดสะสมมูลค่า)(SCBROBOA)",
+    "file": "SCBROBOA.json",
+    "firstDate": "2022-12-01",
+    "lastDate": "2026-03-20",
+    "count": 799,
+    "latestNAV": 18.5035
   }
 ]
