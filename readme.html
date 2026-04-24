@@ -841,130 +841,867 @@
         </div>
       </div>
 
-      <div class="fix-section-label" style="margin-top:16px">Config — per-fund regime scales</div>
-      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
-        ลำดับ priority ในการ resolve scale ต่อกองทุน:
-        <strong>fundScales[name]</strong> → <strong>defaultScale</strong> → <strong>muScale/sigmaScale แบน (legacy)</strong> → <code>{1, 1}</code>
+      <div class="fix-section-label" style="margin-top:16px">Config — per-fund regime scales (ทุกกองทุน)</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:10px">
+        ตารางด้านล่างแสดงค่า scale ครบทุกกองทุน (84 กอง) ที่ใช้ใน <code>js/app.js</code>
+        ค่าใน column <strong>BULL / BEAR / CRISIS</strong> ระบุวิธีปรับ drift และ volatility ในแต่ละ regime:<br>
+        <span style="color:#1d4ed8">●</span> <strong>×μ</strong> = muScale (คูณกับ historical mean log-return ของกอง)<br>
+        <span style="color:#7c3aed">●</span> <strong>%/mo</strong> = muOverride (ค่าสัมบูรณ์ต่อเดือน ใช้แทน muScale สำหรับ Bond/Income/MM)<br>
+        <span style="color:#15803d">●</span> <strong>×σ</strong> = sigmaScale (คูณกับ historical std ของกอง — &lt;1 = calmer, &gt;1 = wilder)
       </p>
-      <pre><code><span class="kw">regimeSwitching</span>: <span class="kw">true</span>,
-
-<span class="kw">regimes</span>: [
-  {
-    name: <span class="str">'Bull'</span>,
-    defaultScale: { muScale: <span class="num">1.0</span>, sigmaScale: <span class="num">1.0</span> }, <span class="cmt">// fallback กองที่ไม่ระบุ</span>
-    fundScales: {
-      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">1.5</span>,              sigmaScale: <span class="num">0.7</span>  }, <span class="cmt">// EM equity</span>
-      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">1.3</span>,              sigmaScale: <span class="num">0.8</span>  }, <span class="cmt">// DM equity</span>
-      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.001</span>,           sigmaScale: <span class="num">0.8</span>  }, <span class="cmt">// bond: +0.1%/เดือน</span>
-      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">-0.002</span>,          sigmaScale: <span class="num">1.1</span>  }, <span class="cmt">// gold lags in bull</span>
-    },
-  },
-  {
-    name: <span class="str">'Bear'</span>,
-    defaultScale: { muScale: <span class="num">-0.5</span>, sigmaScale: <span class="num">1.5</span> },
-    fundScales: {
-      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">-0.5</span>,             sigmaScale: <span class="num">1.8</span>  },
-      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">-0.3</span>,             sigmaScale: <span class="num">1.5</span>  },
-      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.004</span>,           sigmaScale: <span class="num">1.2</span>  }, <span class="cmt">// flight to quality</span>
-      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">0.006</span>,           sigmaScale: <span class="num">1.4</span>  }, <span class="cmt">// safe haven</span>
-    },
-  },
-  {
-    name: <span class="str">'Crisis'</span>,
-    defaultScale: { muScale: <span class="num">-2.0</span>, sigmaScale: <span class="num">2.5</span> },
-    fundScales: {
-      <span class="str">'ES-ASIA-A'</span>: { muScale: <span class="num">-3.0</span>,             sigmaScale: <span class="num">3.0</span>  },
-      <span class="str">'ES-GQG'</span>:    { muScale: <span class="num">-2.0</span>,             sigmaScale: <span class="num">2.5</span>  },
-      <span class="str">'ES-IPLUS'</span>:  { muOverride: <span class="num">0.008</span>,           sigmaScale: <span class="num">1.8</span>  }, <span class="cmt">// bond crisis rally</span>
-      <span class="str">'gold-fund'</span>: { muOverride: <span class="num">0.015</span>,           sigmaScale: <span class="num">2.0</span>  }, <span class="cmt">// +1.5%/เดือน safe-haven</span>
-    },
-  },
-],
-
-<span class="kw">transitionMatrix</span>: [
-  <span class="cmt">//        Bull   Bear   Crisis</span>
-  <span class="cmt">/* Bull   */</span> [<span class="num">0.90</span>, <span class="num">0.09</span>, <span class="num">0.01</span>],
-  <span class="cmt">/* Bear   */</span> [<span class="num">0.15</span>, <span class="num">0.75</span>, <span class="num">0.10</span>],
-  <span class="cmt">/* Crisis */</span> [<span class="num">0.25</span>, <span class="num">0.45</span>, <span class="num">0.30</span>],
-],</code></pre>
-
-      <div class="fix-section-label" style="margin-top:16px">ค่าอ้างอิงสำหรับ Asset Class ต่างๆ</div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>
             <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
-              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">Asset Class</th>
-              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Bull muScale</th>
-              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Bear muScale</th>
-              <th style="padding:8px 12px;text-align:center;color:#1d4ed8">Crisis muScale</th>
-              <th style="padding:8px 12px;text-align:center;color:#7c3aed">Crisis sigmaScale</th>
-              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">หมายเหตุ</th>
+              <th style="padding:7px 10px;text-align:left;color:var(--gray-600);white-space:nowrap">Fund</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--gray-600);white-space:nowrap">Asset Class</th>
+              <th style="padding:7px 8px;text-align:center;color:#16a34a;background:#f0fdf4" colspan="2">BULL</th>
+              <th style="padding:7px 8px;text-align:center;color:#b45309;background:#fef9c3" colspan="2">BEAR</th>
+              <th style="padding:7px 8px;text-align:center;color:#dc2626;background:#fef2f2" colspan="2">CRISIS</th>
+            </tr>
+            <tr style="background:var(--gray-50);border-bottom:1px solid var(--gray-200);font-size:10.5px">
+              <th></th><th></th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">drift</th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">vol</th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">drift</th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">vol</th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">drift</th>
+              <th style="padding:4px 8px;text-align:center;color:var(--gray-500)">vol</th>
             </tr>
           </thead>
           <tbody>
-            <tr style="border-bottom:1px solid var(--gray-100)">
-              <td style="padding:8px 12px;font-weight:600">EM Equity</td>
-              <td style="padding:8px 12px;text-align:center">1.5</td>
-              <td style="padding:8px 12px;text-align:center">−0.5</td>
-              <td style="padding:8px 12px;text-align:center">−3.0</td>
-              <td style="padding:8px 12px;text-align:center">3.0</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">muScale, volatile</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>tsp1-preserver</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.8×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
             </tr>
-            <tr style="border-bottom:1px solid var(--gray-100)">
-              <td style="padding:8px 12px;font-weight:600">DM / Global Equity</td>
-              <td style="padding:8px 12px;text-align:center">1.3</td>
-              <td style="padding:8px 12px;text-align:center">−0.3</td>
-              <td style="padding:8px 12px;text-align:center">−2.0</td>
-              <td style="padding:8px 12px;text-align:center">2.5</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">muScale, ลด extreme</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>tsp2-nurturer</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
             </tr>
-            <tr style="border-bottom:1px solid var(--gray-100)">
-              <td style="padding:8px 12px;font-weight:600">Thematic Equity</td>
-              <td style="padding:8px 12px;text-align:center">2.0</td>
-              <td style="padding:8px 12px;text-align:center">−1.0</td>
-              <td style="padding:8px 12px;text-align:center">−4.0</td>
-              <td style="padding:8px 12px;text-align:center">3.5</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">muScale, amplify EM</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>tsp3-balancer</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
             </tr>
-            <tr style="border-bottom:1px solid var(--gray-100)">
-              <td style="padding:8px 12px;font-weight:600">Gold</td>
-              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
-              <td style="padding:8px 12px;text-align:center">2.0</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">Bull: −0.002, Bear: +0.006, Crisis: +0.015</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>tsp4-explorer</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.4×σ</span></td>
             </tr>
-            <tr style="border-bottom:1px solid var(--gray-100)">
-              <td style="padding:8px 12px;font-weight:600">Bond / Income</td>
-              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
-              <td style="padding:8px 12px;text-align:center">1.8</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">Bull: +0.001, Bear: +0.004, Crisis: +0.008</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>tsp5-gogetter</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
             </tr>
-            <tr>
-              <td style="padding:8px 12px;font-weight:600">Money Market</td>
-              <td style="padding:8px 12px;text-align:center" colspan="3" style="color:#7c3aed">muOverride ต่อ regime</td>
-              <td style="padding:8px 12px;text-align:center">1.2</td>
-              <td style="padding:8px 12px;color:var(--gray-500)">Bull: +0.002, Bear: +0.002, Crisis: +0.001</td>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TISCOMS-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Small/Mid Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.85×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.85×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.7×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TISCOSTF</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Money Market</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.07%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TISCOEU-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Europe Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TISCOUS-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.55×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.7×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TINC-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fef2f2">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TISCOCH</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">China Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UOBSMG</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UOBSHC</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Sector Health</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.15×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.35×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UOBSJSM</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Japan Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>USUS</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.45×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UIFT-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.15%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UGFT</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>USI</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.4%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fef2f2">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UCHINA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">China Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UIDPLUS</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.09%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.07%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UEMIF-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">EM Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.45%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.45×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.62%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UPOP</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UROCK</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UJAZZ</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UFIN-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UGQG</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UGD</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UGBF-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UGIS-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UNI</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>UDB-N</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.7×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABSM</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Small/Mid Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.75×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABIG</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">India Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABAPAC</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Asia Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABCC</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Money Market</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.08%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABV</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Defensive Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.15×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ABG</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Thai Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TBF</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KF-CINCOME-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.35%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fef2f2">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KF-GCHINAD</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">China Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KF-HJAPAND</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Japan Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KFAFIX-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.15%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KFHEALTH-D</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Sector Health</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.35×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TSF-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>TGINC-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>PRINCIPAL iFIXED-C</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Money Market</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>PRINCIPAL GSA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-ULTIMATE GA1</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.8×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-ULTIMATE GA2</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-ULTIMATE GA3</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-ASIA-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Asia Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.7×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fef2f2">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-COF</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">China Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-GF-A</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.65×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-GCORE</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.45×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-GDIV-Acc</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.15×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.45×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.8×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-GQG</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.45×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-GTECH</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Sector Tech</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.4×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-IPLUS</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-LOWBETA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Defensive Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+0.95×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-PIPF</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.4%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.2%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626;font-style:italic">-0.4%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-USTECH</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.75×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.1×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-TM</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.12%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.08%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-CASH</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Money Market</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.05%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.08%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>ES-STSD</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Bond/Income</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.3%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.6×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.15%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KKP CorePath Balanced</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>KKP ACT EQ-D</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Thai Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0f7ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBPOPA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Balanced/Alloc</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.4×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBBANKINGA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.8×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBLEQA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.3×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBOPPA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Thai Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.6×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.7×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBFINA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.8×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBDIGI</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Sector Tech</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBGSIF</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Prop/Infra</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.15×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.35×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBSEA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Asia Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.3×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBSFFPLUS-I</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Money Market</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.06%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.07%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.1%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.1×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBMSE</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.65×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.75×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-3.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">3.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f0fdf4">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBEUSM</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Europe Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.35×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.7×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.9×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBWINA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fff7ed">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBAEMHA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Asia Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.55×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-1.5×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.8×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBAPLUSA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">US/Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.4×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.8×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.55×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fefce8">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBGOLDH</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Gold</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+0.75×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.9×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+0.9×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.6×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#f8fafc">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBGEQA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Other</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#1d4ed8">+1.25×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.85×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-0.45×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.5×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">-2×μ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#dc2626">2.5×σ</span></td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100);background:#fdf4ff">
+              <td style="padding:5px 10px;font-size:11.5px;font-weight:600;white-space:nowrap"><code>SCBGINA</code></td>
+              <td style="padding:5px 8px;font-size:11px;color:var(--gray-500);white-space:nowrap">Global Eq</td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.25%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d">0.75×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.4%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.2×σ</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#15803d;font-style:italic">+0.7%/mo</span></td>
+              <td style="padding:5px 8px;text-align:center;font-size:11.5px"><span style="color:#b45309">1.7×σ</span></td>
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div class="fix-section-label" style="margin-top:16px">กฎที่ต้องรักษาเมื่อแก้ค่า</div>
-      <div class="math-box">
-        1. แต่ละแถวของ transitionMatrix ต้องรวมกัน = 1.0<br>
-        2. จำนวนแถว/คอลัมน์ของ transitionMatrix ต้องเท่ากับจำนวน regimes<br>
-        3. sigmaScale ต้องมากกว่า 0 เสมอ<br>
-        4. muOverride หน่วยเป็น log-return ต่อเดือน (0.01 ≈ +1%/เดือน)<br>
-        5. กองใหม่ที่ไม่ได้ระบุใน fundScales จะ fallback ไป defaultScale อัตโนมัติ
-      </div>
-
-      <div class="impact-box">
-        <span class="impact-icon">✓</span>
-        <div>
-          Correlation structure (Cholesky L) คงเดิมทุก regime
-          — เฉพาะ drift และ volatility scale ของแต่ละกองเปลี่ยน
-          กองใหม่ที่เพิ่มในอนาคตไม่ต้อง modify simulation.js —
-          ระบุ fundScales ใน config เพียงอย่างเดียว
-        </div>
       </div>
 
       <div class="fix-section-label" style="margin-top:16px">จุดที่ต้องแก้ไฟล์ — Quick Reference</div>

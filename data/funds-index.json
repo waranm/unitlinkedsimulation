@@ -599,7 +599,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-20",
     "count": 799,
-    "latestNAV": 13.1387
+    "latestNAV": 13.1387,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ Global Population Trend (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBBANKINGA",
@@ -607,7 +608,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-24",
     "count": 801,
-    "latestNAV": 15.8896
+    "latestNAV": 15.8896,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ SET BANKING SECTOR INDEX (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBLEQA",
@@ -615,7 +617,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 16.6841
+    "latestNAV": 16.6841,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ หุ้น LOW VOLATILITY (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBOPPA",
@@ -623,7 +626,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-20",
     "count": 799,
-    "latestNAV": 10.5151
+    "latestNAV": 10.5151,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ เครดิตออพพอทูนิตี้ (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBFINA",
@@ -631,7 +635,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 10.0822
+    "latestNAV": 10.0822,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ โกลบอล ฟิกซ์ อินคัม (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBDIGI",
@@ -648,7 +653,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-20",
     "count": 799,
-    "latestNAV": 11.9513
+    "latestNAV": 11.9513,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ โกลบอล สตราทีจิก อินเวสเมนท์ ฟันด์"
   },
   {
     "name": "SCBSEA",
@@ -656,7 +662,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-24",
     "count": 801,
-    "latestNAV": 11.954
+    "latestNAV": 11.954,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ซีเล็คท์ อิควิตี้ ฟันด์ (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBSFFPLUS-I",
@@ -673,7 +680,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-24",
     "count": 801,
-    "latestNAV": 10.1142
+    "latestNAV": 10.1142,
+    "longname": "กองทุนเปิด ไทยพาณิชย์หุ้นทุน Mid/Small Cap (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBEUSM",
@@ -681,7 +689,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 14.0456
+    "latestNAV": 14.0456,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ หุ้นยุโรปสมอลแคป"
   },
   {
     "name": "SCBWINA",
@@ -689,7 +698,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 11.579
+    "latestNAV": 11.579,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ เวิลด์อินคัม (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBAEMHA",
@@ -697,7 +707,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 10.0568
+    "latestNAV": 10.0568,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ เอเชียน อีเมอร์จิ้ง ฟันด์ THB เฮดจ์"
   },
   {
     "name": "SCBAPLUSA",
@@ -705,7 +716,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 12.5627
+    "latestNAV": 12.5627,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ เอเชียแปซิฟิคอินคัมพลัส (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBGOLDH",
@@ -713,7 +725,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-24",
     "count": 801,
-    "latestNAV": 19.8034
+    "latestNAV": 19.8034,
+    "longname": "กองทุนเปิด ไทยพาณิชย์โกลด์ THB เฮดจ์"
   },
   {
     "name": "SCBGEQA",
@@ -721,7 +734,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-20",
     "count": 799,
-    "latestNAV": 17.6942
+    "latestNAV": 17.6942,
+    "longname": "กองทุนเปิด ไทยพาณิชย์โกลบอล อิควิตี้ (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBGINA",
@@ -729,7 +743,8 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-23",
     "count": 800,
-    "latestNAV": 11.6252
+    "latestNAV": 11.6252,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ โกลบอลอินคัม (ชนิดสะสมมูลค่า)"
   },
   {
     "name": "SCBROBOA",
@@ -737,6 +752,7 @@
     "firstDate": "2022-12-01",
     "lastDate": "2026-03-20",
     "count": 799,
-    "latestNAV": 18.5035
+    "latestNAV": 18.5035,
+    "longname": "กองทุนเปิด ไทยพาณิชย์ โกลบอลโรโบติกส์ (ชนิดสะสมมูลค่า)"
   }
 ]
