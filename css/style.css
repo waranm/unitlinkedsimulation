@@ -16,6 +16,12 @@
   --radius: 8px;
   --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+
+  /* Fund Library design tokens */
+  --risk-1: #22c55e; --risk-2: #4ade80; --risk-3: #a3e635; --risk-4: #facc15;
+  --risk-5: #fb923c; --risk-6: #f97316; --risk-7: #ef4444; --risk-8: #b91c1c;
+  --text-primary: #1a2744; --text-secondary: #6a7280; --text-muted: #8a9099;
+  --accent-blue: #3b6cf5; --accent-green: #16a34a; --navy: #1a2744;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -684,3 +690,167 @@ main {
 .risk-item.risk-up   { border-left: 3px solid var(--success); }
 .risk-item.risk-down { border-left: 3px solid var(--danger); }
 .risk-item.risk-up2  { border-left: 3px solid var(--primary); }
+
+/* ════════════════════════════════════════════════════
+   Fund Library Redesign (fl- prefix)
+   ════════════════════════════════════════════════════ */
+
+/* Card override — remove default padding so inner sections control spacing */
+.fl-card { padding: 0 !important; overflow: hidden; }
+
+/* Header */
+.fl-header { padding: 16px 20px 0; }
+.fl-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 12px;
+}
+.fl-title { display: flex; align-items: center; gap: 10px; }
+.fl-title-icon { font-size: 18px; flex-shrink: 0; }
+.fl-title-text { font-size: 14.5px; font-weight: 600; color: var(--navy); }
+.fl-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+/* Risk mini-squares (header quick-filter) */
+.fl-risk-squares { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.fl-risk-sq {
+  width: 20px; height: 20px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+  cursor: pointer; transition: outline 0.1s;
+  outline: 2px solid transparent; outline-offset: 1px;
+}
+.fl-risk-sq.active { outline-color: var(--navy); }
+.fl-risk-sq:hover { opacity: 0.85; }
+
+/* Search bar */
+.fl-search-bar { position: relative; margin-bottom: 12px; }
+.fl-search-bar input {
+  width: 100%; padding: 8px 34px 8px 34px;
+  border: 1.5px solid var(--gray-200); border-radius: 7px;
+  font-size: 13px; font-family: inherit; outline: none;
+  background: #f8f9fb; color: var(--navy);
+  transition: border-color 0.15s, background 0.15s;
+}
+.fl-search-bar input:focus { border-color: var(--accent-blue); background: #fff; }
+.fl-search-icon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--gray-400); font-size: 14px; pointer-events: none;
+}
+.fl-search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--gray-400); cursor: pointer;
+  font-size: 17px; line-height: 1; padding: 2px; display: none;
+}
+.fl-search-clear:hover { color: var(--gray-700); }
+
+/* Risk tabs (scrollable row, no bottom border on tab) */
+.fl-risk-tabs {
+  display: flex; gap: 4px; overflow-x: auto;
+  -ms-overflow-style: none; scrollbar-width: none;
+}
+.fl-risk-tabs::-webkit-scrollbar { display: none; }
+.fl-risk-tab {
+  flex-shrink: 0; padding: 6px 10px;
+  border-radius: 6px 6px 0 0;
+  border: 1.5px solid var(--gray-200); border-bottom: none;
+  background: #f4f5f7; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+  display: flex; align-items: center; gap: 5px;
+  transition: background 0.1s, color 0.1s;
+  position: relative; bottom: -1px;
+}
+.fl-risk-tab:hover { background: #eceef1; color: var(--navy); }
+.fl-risk-tab.active {
+  background: #fff; color: var(--navy);
+  border-color: var(--gray-200); font-weight: 600;
+}
+.fl-risk-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.fl-risk-count {
+  font-size: 10px; padding: 1px 5px; border-radius: 10px;
+  background: #e8eaed; color: var(--text-secondary); font-weight: 600;
+}
+.fl-risk-tab.active .fl-risk-count { background: var(--navy); color: #fff; }
+
+/* List panel */
+.fl-list-panel { border-top: 1.5px solid var(--gray-200); }
+.fl-summary {
+  padding: 7px 20px;
+  background: #f8f9fb; border-bottom: 1px solid #eceef1;
+  font-size: 11.5px; color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.fl-summary strong { color: var(--navy); }
+
+/* Scrollable list */
+.fl-list-scroll {
+  max-height: 340px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--gray-300) transparent;
+}
+.fl-list-scroll::-webkit-scrollbar { width: 5px; }
+.fl-list-scroll::-webkit-scrollbar-track { background: transparent; }
+.fl-list-scroll::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+
+/* Fund row */
+.fl-fund-row {
+  padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #f4f5f7; transition: background 0.1s;
+}
+.fl-fund-row:last-child { border-bottom: none; }
+.fl-fund-row:hover { background: #fafbfc; }
+.fl-fund-row.loaded { background: #f0fdf4; }
+.fl-fund-row.loaded:hover { background: #ecfcf4; }
+
+/* Risk pill */
+.fl-risk-pill {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.fl-r1 { background: var(--risk-1); }
+.fl-r2 { background: var(--risk-2); color: #166534; }
+.fl-r3 { background: var(--risk-3); color: #3f6212; }
+.fl-r4 { background: var(--risk-4); color: #854d0e; }
+.fl-r5 { background: var(--risk-5); }
+.fl-r6 { background: var(--risk-6); }
+.fl-r7 { background: var(--risk-7); }
+.fl-r8 { background: var(--risk-8); }
+
+/* Fund info */
+.fl-fund-info { flex: 1; min-width: 0; }
+.fl-fund-name {
+  font-size: 13px; font-weight: 500; color: var(--navy);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.fl-fund-meta { font-size: 11px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.fl-nav { font-family: 'IBM Plex Mono', 'Courier New', monospace; font-weight: 500; color: var(--navy); }
+
+/* Load button */
+.fl-btn-load {
+  flex-shrink: 0; padding: 5px 13px; border-radius: 5px;
+  font-size: 11.5px; font-family: inherit; font-weight: 500;
+  cursor: pointer; border: 1.5px solid; transition: all 0.15s; white-space: nowrap;
+}
+.fl-btn-load.not-loaded { border-color: var(--accent-blue); color: var(--accent-blue); background: #fff; }
+.fl-btn-load.not-loaded:hover { background: var(--accent-blue); color: #fff; }
+.fl-btn-load.is-loaded { border-color: var(--accent-green); color: var(--accent-green); background: #f0fdf4; cursor: default; }
+
+/* Empty state */
+.fl-empty-state { padding: 32px 20px; text-align: center; color: var(--gray-400); font-size: 13px; }
+.fl-loading { padding: 20px; color: var(--gray-400); font-size: 13px; }
+
+/* Footer */
+.fl-footer {
+  padding: 13px 20px; border-top: 1px solid var(--gray-200);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.fl-loaded-summary { font-size: 12px; color: var(--text-secondary); }
+.fl-loaded-summary strong { color: var(--accent-green); }
+.fl-btn-proceed {
+  background: var(--navy); color: #fff; border: none;
+  padding: 9px 22px; border-radius: 6px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: background 0.15s;
+}
+.fl-btn-proceed:hover { background: #243660; }
+.fl-btn-proceed:disabled { background: var(--gray-300); cursor: default; }

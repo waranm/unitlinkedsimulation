@@ -35,6 +35,8 @@ const state = {
   showMean: true,           // toggle for mean overlay on chart
 
   compareResults: null,     // { monthly, quarterly, annual } — cached when compare mode runs
+
+  loadedFundIds: new Set(), // codes currently loaded from fund library
 };
 
 // ─── Step management ─────────────────────────────────────────────────────────
@@ -217,6 +219,7 @@ function renderSavedFundsList() {
       const name = btn.dataset.fund;
       if (!confirm(`ลบข้อมูลกองทุน "${name}" ออกจากหน่วยความจำ?`)) return;
       deleteFundFromStorage(name);
+      unloadFund(name);          // bidirectional sync: update library loaded state
       const updated = loadStoredFunds();
       applyNavData(updated);
     });
@@ -962,66 +965,64 @@ document.getElementById('btnExportCSV').addEventListener('click', () => {
 document.getElementById('btnExportPNG').addEventListener('click', () => exportChartPNG('unit-linked-simulation.png'));
 document.getElementById('btnRerun').addEventListener('click', () => goToStep(1));
 
-// ─── Fund Library (pre-hosted data files) ────────────────────────────────────
+// ─── Fund Library controller ──────────────────────────────────────────────────
 
-async function loadFundLibrary() {
-  const container = document.getElementById('fundLibrary');
-  try {
-    const res = await fetch('data/funds-index.json');
-    if (!res.ok) throw new Error('ไม่พบ funds-index.json');
-    const index = await res.json();
+let flActiveTab = 'all';
+let flSearchQuery = '';
 
-    if (!index.length) {
-      container.innerHTML = '<p style="color:var(--gray-400);font-size:13px">ยังไม่มีกองทุนในคลัง</p>';
-      return;
-    }
+const FL_RISK_COLORS = {
+  1: '#22c55e', 2: '#4ade80', 3: '#a3e635', 4: '#facc15',
+  5: '#fb923c', 6: '#f97316', 7: '#ef4444', 8: '#b91c1c',
+};
+const FL_RISK_TEXT = { 2: '#166534', 3: '#3f6212', 4: '#854d0e' };
 
-    // Check which funds are already loaded
-    const stored = loadStorageRaw();
-
-    container.innerHTML = index.map(entry => {
-      const isLoaded = !!stored[entry.name];
-      const dateRange = `${entry.firstDate} → ${entry.lastDate}`;
-      return `
-        <div class="fund-lib-card" id="lib-${CSS.escape(entry.name)}">
-          <div class="fund-card-info">
-            <div class="fund-card-name">${entry.name}</div>
-            <div class="fund-card-meta">
-              ${entry.count.toLocaleString()} วัน &nbsp;·&nbsp; ${dateRange}
-              &nbsp;·&nbsp; NAV ล่าสุด: <strong>${entry.latestNAV}</strong>
-            </div>
-          </div>
-          <button class="btn btn-sm lib-load-btn ${isLoaded ? 'btn-loaded' : 'btn-primary'}"
-            data-file="${entry.file}" data-name="${entry.name}">
-            ${isLoaded ? '✓ โหลดแล้ว' : '+ โหลด'}
-          </button>
-        </div>
-      `;
-    }).join('');
-
-    container.querySelectorAll('.lib-load-btn').forEach(btn => {
-      btn.addEventListener('click', () => loadFundFromLibrary(btn));
-    });
-
-  } catch (err) {
-    // No library available (running locally without server) — hide section silently
-    container.closest('.card').style.display = 'none';
+function filterFunds() {
+  let list = FUND_LIBRARY;
+  if (flActiveTab !== 'all') list = list.filter(f => f.risk === flActiveTab);
+  if (flSearchQuery.trim()) {
+    const q = flSearchQuery.toLowerCase();
+    list = list.filter(f =>
+      f.nameTH.toLowerCase().includes(q) ||
+      f.code.toLowerCase().includes(q)
+    );
   }
+  return list;
 }
 
-async function loadFundFromLibrary(btn) {
-  const file = btn.dataset.file;
-  const name = btn.dataset.name;
+function setRiskTab(level) {
+  flActiveTab = level;
+  renderFundLibrary();
+}
 
-  btn.disabled = true;
-  btn.textContent = 'กำลังโหลด...';
+function setSearchQuery(q) {
+  flSearchQuery = q;
+  const clearBtn = document.getElementById('flSearchClear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+  renderFundLibrary();
+}
+
+function loadFund(code) {
+  const fund = FUND_LIBRARY.find(f => f.code === code);
+  if (!fund || state.loadedFundIds.has(code)) return;
+  state.loadedFundIds.add(code);
+  _fetchAndStoreFund(fund);
+}
+
+function unloadFund(code) {
+  state.loadedFundIds.delete(code);
+  renderFundLibrary();
+  _updateFlFooter();
+}
+
+async function _fetchAndStoreFund(fund) {
+  const btn = document.getElementById('fl-btn-' + CSS.escape(fund.code));
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังโหลด...'; }
 
   try {
-    const res = await fetch(`data/${file}`);
-    if (!res.ok) throw new Error(`โหลดไฟล์ไม่ได้: ${file}`);
+    const res = await fetch('data/' + fund.file);
+    if (!res.ok) throw new Error('โหลดไฟล์ไม่ได้: ' + fund.file);
     const json = await res.json();
 
-    // Parse rows — dates are ISO strings
     const rows = (json.rows || []).map(r => ({
       date:  new Date(r.date),
       nav:   r.nav,
@@ -1031,23 +1032,155 @@ async function loadFundFromLibrary(btn) {
 
     if (rows.length < 2) throw new Error('ข้อมูลในไฟล์ไม่เพียงพอ');
 
-    saveFundToStorage(name, rows);
+    saveFundToStorage(fund.code, rows);
     const allData = loadStoredFunds();
     applyNavData(allData);
-
-    btn.textContent = '✓ โหลดแล้ว';
-    btn.className = 'btn btn-sm btn-loaded';
-    btn.disabled = false;
-
-    showUploadSuccess(`โหลด "${name}" จากคลังกองทุนเรียบร้อย`);
+    showUploadSuccess('โหลด "' + fund.code + '" จากคลังกองทุนเรียบร้อย');
+    renderFundLibrary();
+    _updateFlFooter();
   } catch (err) {
-    btn.textContent = '+ โหลด';
-    btn.disabled = false;
+    state.loadedFundIds.delete(fund.code);
+    if (btn) { btn.disabled = false; btn.textContent = '+ โหลด'; btn.className = 'fl-btn-load not-loaded'; }
     showUploadError(err.message);
   }
 }
 
+function renderFundLibrary() {
+  if (!FUND_LIBRARY.length) return;
+
+  // Compute risk counts
+  const riskCounts = {};
+  FUND_LIBRARY.forEach(f => { riskCounts[f.risk] = (riskCounts[f.risk] || 0) + 1; });
+  const availableRisks = Object.keys(riskCounts).map(Number).sort((a, b) => a - b);
+
+  // Risk mini-squares
+  const squaresEl = document.getElementById('flRiskSquares');
+  if (squaresEl) {
+    squaresEl.innerHTML = availableRisks.map(r => {
+      const active = flActiveTab === r;
+      const tc = FL_RISK_TEXT[r] || '#fff';
+      return '<div class="fl-risk-sq' + (active ? ' active' : '') + '"'
+        + ' style="background:' + FL_RISK_COLORS[r] + ';color:' + tc + '"'
+        + ' onclick="setRiskTab(flActiveTab === ' + r + ' ? \'all\' : ' + r + ')"'
+        + ' title="ระดับความเสี่ยง ' + r + '">' + r + '</div>';
+    }).join('');
+  }
+
+  // Risk tabs
+  const tabsEl = document.getElementById('flRiskTabs');
+  if (tabsEl) {
+    const allActive = flActiveTab === 'all';
+    let html = '<button class="fl-risk-tab' + (allActive ? ' active' : '')
+      + '" onclick="setRiskTab(\'all\')">ทั้งหมด'
+      + ' <span class="fl-risk-count">' + FUND_LIBRARY.length + '</span></button>';
+    html += availableRisks.map(r => {
+      const active = flActiveTab === r;
+      return '<button class="fl-risk-tab' + (active ? ' active' : '') + '" onclick="setRiskTab(' + r + ')">'
+        + '<span class="fl-risk-dot" style="background:' + FL_RISK_COLORS[r] + '"></span>'
+        + 'ระดับ ' + r
+        + ' <span class="fl-risk-count">' + riskCounts[r] + '</span>'
+        + '</button>';
+    }).join('');
+    tabsEl.innerHTML = html;
+  }
+
+  // Filter
+  const filtered = filterFunds();
+
+  // Summary bar
+  const summaryEl = document.getElementById('flSummary');
+  if (summaryEl) {
+    const tabLabel = flActiveTab !== 'all' ? ' · ระดับความเสี่ยง <strong>' + flActiveTab + '</strong>' : '';
+    const searchLabel = flSearchQuery ? ' · ค้นหา "<strong>' + flSearchQuery + '</strong>"' : '';
+    const loadedCount = state.loadedFundIds.size;
+    summaryEl.innerHTML =
+      '<span>แสดง <strong>' + filtered.length + '</strong> กองทุน' + tabLabel + searchLabel + '</span>'
+      + '<span>โหลดแล้ว <strong style="color:var(--accent-green)">' + loadedCount + '</strong> กองทุน</span>';
+  }
+
+  // Fund list
+  const listEl = document.getElementById('flList');
+  if (!listEl) return;
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = '<div class="fl-empty-state">ไม่พบกองทุนที่ตรงกับการค้นหา</div>';
+    _updateFlFooter();
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(fund => {
+    const isLoaded = state.loadedFundIds.has(fund.code);
+    const safeCode = CSS.escape(fund.code);
+    const escapedName = fund.nameTH.replace(/"/g, '&quot;');
+    const btnHtml = isLoaded
+      ? '<button class="fl-btn-load is-loaded" id="fl-btn-' + safeCode + '">✓ โหลดแล้ว</button>'
+      : '<button class="fl-btn-load not-loaded" id="fl-btn-' + safeCode + '" data-code="' + fund.code.replace(/"/g, '&quot;') + '">+ โหลด</button>';
+
+    return '<div class="fl-fund-row' + (isLoaded ? ' loaded' : '') + '" id="fl-row-' + safeCode + '">'
+      + '<div class="fl-risk-pill fl-r' + fund.risk + '" title="ระดับความเสี่ยง ' + fund.risk + '">' + fund.risk + '</div>'
+      + '<div class="fl-fund-info">'
+      + '<div class="fl-fund-name" title="' + escapedName + '">' + fund.nameTH + '</div>'
+      + '<div class="fl-fund-meta">'
+      + '<span style="font-weight:600;color:#4a5568">' + fund.code + '</span>'
+      + '<span>' + fund.days.toLocaleString() + ' วัน · ' + fund.dateFrom + ' — ' + fund.dateTo + '</span>'
+      + '<span>NAV ล่าสุด: <span class="fl-nav">' + fund.nav.toFixed(4) + '</span></span>'
+      + '</div></div>'
+      + btnHtml
+      + '</div>';
+  }).join('');
+
+  _updateFlFooter();
+}
+
+function _updateFlFooter() {
+  const count = state.loadedFundIds.size;
+  const hasData = state.fundNames.length > 0;
+  const summaryEl = document.getElementById('flLoadedSummary');
+  const btnEl = document.getElementById('flBtnProceed');
+  if (summaryEl) {
+    summaryEl.innerHTML = count > 0
+      ? '<strong>' + count + '</strong> กองทุนถูกเลือก · จะถูกเพิ่มในกองทุนที่บันทึกไว้'
+      : '<strong>0</strong> กองทุนถูกเลือก';
+  }
+  if (btnEl) btnEl.disabled = !hasData;
+}
+
 // ─── Init: load stored funds on page start ────────────────────────────────────
 applyNavData(loadStoredFunds());
-loadFundLibrary();
 goToStep(0);
+
+// Wire fund list — event delegation (single listener, survives re-renders)
+document.getElementById('flList').addEventListener('click', e => {
+  const btn = e.target.closest('.fl-btn-load.not-loaded');
+  if (!btn) return;
+  const code = btn.dataset.code;
+  if (code) loadFund(code);
+});
+
+// Wire search
+document.getElementById('flSearchInput').addEventListener('input', e => setSearchQuery(e.target.value));
+document.getElementById('flSearchClear').addEventListener('click', () => {
+  document.getElementById('flSearchInput').value = '';
+  setSearchQuery('');
+  document.getElementById('flSearchInput').focus();
+});
+
+// Wire footer proceed button
+document.getElementById('flBtnProceed').addEventListener('click', () => {
+  if (state.fundNames.length === 0) return;
+  buildParamsStep();
+  goToStep(1);
+});
+
+// Init fund library
+initFundLibrary().then(() => {
+  if (!FUND_LIBRARY.length) {
+    document.getElementById('fundLibraryCard').style.display = 'none';
+    return;
+  }
+  // Sync loadedFundIds from localStorage on first load
+  const stored = loadStorageRaw();
+  FUND_LIBRARY.forEach(f => { if (stored[f.code]) state.loadedFundIds.add(f.code); });
+  renderFundLibrary();
+  _updateFlFooter();
+});

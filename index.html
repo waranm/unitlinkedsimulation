@@ -7,7 +7,7 @@
   <!-- SheetJS for XLS/XLSX reading -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -73,15 +73,49 @@
       <div id="savedFundsList"></div>
     </div>
 
-    <!-- Fund Library -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📚</span> คลังกองทุน (Fund Library)</div>
-      <p style="font-size:13px;color:var(--gray-500);margin-bottom:12px">
-        กองทุนที่เตรียมข้อมูลไว้ให้แล้ว — คลิกเพื่อโหลดได้เลย
-      </p>
-      <div id="fundLibrary">
-        <div style="color:var(--gray-400);font-size:13px">กำลังโหลดรายการ...</div>
+    <!-- Fund Library Redesign -->
+    <div class="card fl-card" id="fundLibraryCard">
+
+      <!-- Header: title + risk squares + search + tabs -->
+      <div class="fl-header">
+        <div class="fl-title-row">
+          <div class="fl-title">
+            <span class="fl-title-icon">📚</span>
+            <div>
+              <div class="fl-title-text">
+                คลังกองทุน <span style="font-weight:400;color:var(--text-secondary)">(Fund Library)</span>
+              </div>
+              <div class="fl-subtitle">คลิกปุ่ม "โหลด" เพื่อเพิ่มกองทุนลงในรายการ</div>
+            </div>
+          </div>
+          <div class="fl-risk-squares" id="flRiskSquares"></div>
+        </div>
+
+        <div class="fl-search-bar">
+          <span class="fl-search-icon">🔍</span>
+          <input type="text" id="flSearchInput" placeholder="ค้นหากองทุน... (ชื่อ, รหัส)" autocomplete="off" />
+          <button class="fl-search-clear" id="flSearchClear">×</button>
+        </div>
+
+        <div class="fl-risk-tabs" id="flRiskTabs"></div>
       </div>
+
+      <!-- List panel: summary bar + scrollable list -->
+      <div class="fl-list-panel">
+        <div class="fl-summary" id="flSummary"></div>
+        <div class="fl-list-scroll" id="flList">
+          <div class="fl-loading">กำลังโหลดรายการ...</div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="fl-footer">
+        <div class="fl-loaded-summary" id="flLoadedSummary">
+          <strong>0</strong> กองทุนถูกเลือก
+        </div>
+        <button class="fl-btn-proceed" id="flBtnProceed" disabled>ถัดไป: ตั้งค่า →</button>
+      </div>
+
     </div>
 
     <div class="action-row">
@@ -290,6 +324,7 @@
 <script src="js/simulation.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/export.js"></script>
+<script src="js/fundLibrary.js"></script>
 <script src="js/app.js"></script>
 
 </body>
