@@ -189,7 +189,10 @@
 
     <!-- Asset Allocation -->
     <div class="card">
-      <div class="card-title"><span class="icon">🥧</span> การจัดสรรสินทรัพย์ (Asset Allocation)</div>
+      <div class="card-title" style="justify-content:space-between">
+        <span><span class="icon">🥧</span> การจัดสรรสินทรัพย์ (Asset Allocation)</span>
+        <button class="btn btn-sm btn-secondary" id="btnResetAlloc" title="รีเซ็ตสัดส่วนเป็นค่าเริ่มต้น (เท่าๆกัน)">↺ รีเซ็ต</button>
+      </div>
       <table class="alloc-table" id="allocTable">
         <thead>
           <tr>
@@ -200,6 +203,7 @@
         <tbody></tbody>
       </table>
       <div class="alloc-total" id="allocTotal">รวม: 0%</div>
+      <div id="allocWarnings"></div>
     </div>
 
     <!-- Monte Carlo N -->
@@ -245,6 +249,9 @@
 
   <!-- ── STEP 4: Results ─────────────────────────────────────────────────── -->
   <div class="section" id="step-results">
+
+    <!-- Covariance quality warning — shown when history is short or pairs are thin -->
+    <div id="covWarningBanner" style="display:none"></div>
 
     <!-- Outcome Summary Panel — injected by renderOutcomeSummary() -->
     <div id="resultSummaryPanel"></div>
@@ -321,6 +328,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <!-- App modules -->
+<script src="js/cov-builder.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/export.js"></script>

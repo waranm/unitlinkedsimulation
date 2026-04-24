@@ -163,11 +163,14 @@
       <li><a href="#data">ข้อมูล Input และการเตรียมข้อมูล</a></li>
       <li><a href="#stats">การประมาณค่าสถิติ (μ, σ)</a></li>
       <li><a href="#correlation">Correlation Matrix และ Cholesky Decomposition</a></li>
+      <li><a href="#unequal-history">กองทุนที่มีประวัติไม่เท่ากัน — Unequal History Handling</a></li>
+      <li><a href="#ul-constraints">UL Product Constraints — กฎ 10 กอง / 5% Min Allocation</a></li>
       <li><a href="#gbm">โมเดล GBM — การ Simulate NAV</a></li>
       <li><a href="#regime">Regime Switching — Markov Transition Model</a></li>
       <li><a href="#dca">DCA Premium และ Offer/BID Pricing</a></li>
       <li><a href="#rebalance">Rebalancing</a></li>
       <li><a href="#output">Output — Percentile Bands, Mean, IRR</a></li>
+      <li><a href="#reproducibility">Reproducibility และ Seeded PRNG</a></li>
       <li><a href="#limits">ข้อจำกัดและสมมติฐาน</a></li>
     </ol>
   </div>
@@ -340,7 +343,7 @@
     <div class="fix-header">
       <div>
         <div class="fix-title">Correlation Matrix และ Cholesky Decomposition</div>
-        <div class="fix-file">simulation.js · getAlignedMonthlyReturns() · computeCovMatrix() · cholesky()</div>
+        <div class="fix-file">cov-builder.js · buildConsistentCov() · simulation.js · cholesky()</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
         <span class="badge badge-math">Math</span>
@@ -357,16 +360,20 @@
         การ ignore correlation ทำให้ diversification ถูก overestimate
       </p>
 
-      <div class="fix-section-label">ขั้นตอน</div>
+      <div class="fix-section-label">ขั้นตอน — Correlation Rebuild Strategy</div>
       <div class="math-box">
-        <strong>Step 1 — Align returns:</strong><br>
-        &nbsp;&nbsp;หา intersection ของเดือนที่ข้อมูลครบทุกกองทุน<br>
-        &nbsp;&nbsp;สร้าง return matrix R[i][t] = log(NAV_{i,t} / NAV_{i,t-1})<br><br>
-        <strong>Step 2 — Sample Covariance:</strong><br>
-        &nbsp;&nbsp;Σ[i][j] = (1/(T−1)) · Σ_t (R[i][t] − μ_i)(R[j][t] − μ_j)<br><br>
-        <strong>Step 3 — Cholesky Decomposition:</strong><br>
+        <strong>Step 1 — ประมาณ σ_i จาก history ของกองทุน i ทั้งหมด</strong><br>
+        &nbsp;&nbsp;ใช้ full history ของแต่ละกอง (ไม่ตัดให้เท่ากัน)<br>
+        &nbsp;&nbsp;← ได้ variance estimate ที่ unbiased ต่อแต่ละกอง<br><br>
+        <strong>Step 2 — ประมาณ ρ_ij จาก overlap จริงของคู่ (i, j) เท่านั้น</strong><br>
+        &nbsp;&nbsp;ใช้ pairwise overlapping returns (weekly → monthly fallback)<br>
+        &nbsp;&nbsp;พร้อม shrinkage และ MIN_OBS guard<br>
+        &nbsp;&nbsp;← รายละเอียดใน <a href="#unequal-history" style="color:var(--primary)">Section ถัดไป</a><br><br>
+        <strong>Step 3 — Rebuild Σ จาก σ และ ρ</strong><br>
+        &nbsp;&nbsp;Σ_ij = ρ_ij · σ_i · σ_j &nbsp;&nbsp;← internally consistent<br><br>
+        <strong>Step 4 — Cholesky Decomposition</strong><br>
         &nbsp;&nbsp;หา lower-triangular L ที่ทำให้ L · Lᵀ = Σ<br><br>
-        <strong>Step 4 — Correlated Shocks:</strong><br>
+        <strong>Step 5 — Correlated Shocks ใน Simulation</strong><br>
         &nbsp;&nbsp;z ~ N(0, I)  →  w = L · z  →  Cov(w) = L·Lᵀ = Σ
       </div>
 
@@ -388,6 +395,317 @@
           ไม่มี overhead จาก Cholesky
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       4b. Unequal History Handling
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="unequal-history">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">กองทุนที่มีประวัติไม่เท่ากัน — Unequal History Handling</div>
+        <div class="fix-file">cov-builder.js · buildConsistentCov() · buildCovWarningMessage()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-math">Math</span>
+        <span class="badge badge-stats">Statistics</span>
+        <span class="badge badge-eng">Engineering</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">ปัญหาของ Approach เดิม</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:10px;line-height:1.7">
+        approach เดิมใช้ <strong>inception backfill</strong> — กองทุนที่เพิ่งเปิดตัวจะถูก
+        ยัดค่า NAV แรกย้อนไปจนถึงวันเริ่มต้นของกองที่เก่าที่สุด
+        ทำให้ covariance matrix มี 2 ปัญหาใหญ่:
+      </p>
+      <div class="two-col">
+        <div class="warn-box" style="margin-top:0">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Variance ถูก Deflate</strong><br>
+            ช่วงที่ backfill ให้ log-return = 0 ทุกเดือน (ln(NAV/NAV) = 0)
+            ทำให้ T พองตัว แต่ variance กลับต่ำกว่าจริง
+          </div>
+        </div>
+        <div class="warn-box" style="margin-top:0">
+          <span style="font-size:16px;flex-shrink:0">⚠️</span>
+          <div>
+            <strong>Correlation ถูก Attenuate</strong><br>
+            ช่วง backfill ที่ return = 0 ทำให้ correlation ระหว่างกองถูก
+            ดึงเข้าหา 0 โดยไม่มี statistical basis
+          </div>
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">กลยุทธ์ใหม่ — Correlation Rebuild</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แยก 2 parameter ออกจากกัน แล้ว rebuild covariance จาก component:
+      </p>
+      <div class="math-box">
+        σ_i  ← ประมาณจาก <strong>full history ของกอง i</strong> (ไม่แตะ)<br>
+        ρ_ij ← ประมาณจาก <strong>overlapping periods จริงของคู่ (i,j) เท่านั้น</strong><br><br>
+        Σ_ij = ρ_ij · σ_i · σ_j  &nbsp;&nbsp;← internally consistent, unbiased
+      </div>
+      <p style="font-size:13px;color:var(--gray-700);margin-top:10px">
+        วิธีนี้ทำให้กองที่เปิดมานาน 10 ปีได้ variance ที่ถูกต้องจากข้อมูลทั้งหมด
+        ขณะที่กองใหม่ยังได้ correlation ที่ประมาณจากช่วงที่มีข้อมูลจริง
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">Weekly → Monthly Grain Selection</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ทุก pair ลองใช้ <strong>weekly returns</strong> ก่อน (ข้อมูลหนาแน่นกว่า ลด Epps bias)
+        ถ้า overlap &lt; 26 สัปดาห์ (~6 เดือน) ตกลงไปใช้ <strong>monthly returns</strong>
+      </p>
+      <div class="math-box">
+        ลำดับ:<br>
+        1. สร้าง YYYY-Www → NAV map ต่อกอง (ISO-week key, ใช้ Thursday เป็น anchor)<br>
+        2. หา intersection ของ weeks ที่มีข้อมูลทั้ง 2 กอง<br>
+        3. คำนวณ log-return เฉพาะ consecutive weeks (ข้าม gap ถ้าขาด)<br>
+        4. ถ้า T_weekly &lt; 26 → ทำซ้ำขั้นตอน 1-3 ด้วย monthly maps<br>
+        5. ถ้า T_monthly &lt; 6 → ρ_ij = 0 (MIN_OBS guard — ดูส่วนถัดไป)
+      </div>
+      <pre><code><span class="cmt">// cov-builder.js — grain selection per pair</span>
+<span class="kw">let</span> { ra, rb, T } = <span class="fn">pairwiseReturns</span>(weeklyMaps[i], weeklyMaps[j]);
+<span class="kw">if</span> (T &lt; MIN_OBS_WEEKLY) {          <span class="cmt">// MIN_OBS_WEEKLY = 26</span>
+  ({ ra, rb, T } = <span class="fn">pairwiseReturns</span>(monthlyMaps[i], monthlyMaps[j]));
+  pairGrain = <span class="str">'monthly'</span>;
+}</code></pre>
+
+      <div class="fix-section-label" style="margin-top:16px">MIN_OBS Guard — ป้องกัน Noisy Correlation</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ถ้า overlap สั้นเกินไป correlation ที่ได้จะ noisy มาก
+        (เช่น 3 เดือน ρ จาก 3 data points มี error ±0.5 ขึ้นไป)
+        ดีกว่าตั้ง ρ_ij = 0 ตรงๆ แทนที่จะใส่ค่า noisy เข้า matrix
+      </p>
+      <div class="math-box">
+        MIN_OBS_WEEKLY  = 26 สัปดาห์  (~6 เดือน)<br>
+        MIN_OBS_MONTHLY = 6 เดือน<br><br>
+        ถ้า overlap &lt; threshold ทั้ง weekly และ monthly → ρ_ij = 0<br>
+        (จำนวน zeroed pairs รายงานใน diagnostics.zeroedPairs)
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Per-Pair Shrinkage toward Identity</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แม้ overlap ผ่าน MIN_OBS แต่ถ้าสั้น correlation estimate ยังมี noise สูง
+        ใช้ <strong>Ledoit-Wolf-style shrinkage</strong> ดึง ρ เข้าหา 0 ตาม
+        ความสั้นของ overlap (per-pair — ไม่ใช่ per-matrix)
+      </p>
+      <div class="math-box">
+        δ_ij = min(1, (N+1) / (T_monthly − 1))<br><br>
+        ρ_shrunk = (1 − δ_ij) · ρ_sample<br><br>
+        N = จำนวนกองทุนทั้งหมด<br>
+        T_monthly = overlap เป็นเดือน (weekly ÷ 4.33)<br><br>
+        δ → 0 เมื่อ T ยาว &nbsp;&nbsp;(overlap มาก → เชื่อ sample correlation)<br>
+        δ → 1 เมื่อ T สั้น หรือ N ใหญ่ &nbsp;(ดึงเข้าหา 0 เต็มๆ)
+      </div>
+      <p style="font-size:13px;color:var(--gray-700);margin-top:10px">
+        ตัวอย่าง: N=5 กองทุน, overlap 12 เดือน → δ = 6/11 ≈ 0.55
+        → ρ_shrunk ≈ 0.45 · ρ_sample (ดึงเข้าหา 0 ครึ่งหนึ่ง)
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">PSD Repair — Eigenvalue Clipping</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        การ shrink แต่ละ pair ด้วย δ ที่ต่างกัน อาจทำให้ correlation matrix
+        ไม่ Positive Semi-Definite (PSD) ซึ่ง Cholesky decomposition จะ fail
+        วิธีแก้: Jacobi eigendecomposition + eigenvalue clipping
+      </p>
+      <div class="math-box">
+        1. Eigen-decompose: C = V · Λ · Vᵀ &nbsp;&nbsp;(Jacobi rotation, stable สำหรับ N ≤ 200)<br>
+        2. Clip eigenvalues:  λ_i = max(λ_i, 1e-8)<br>
+        3. Reconstruct: M = V · Λ_clipped · Vᵀ<br>
+        4. Rescale diagonal → 1 &nbsp;&nbsp;(คืนรูป correlation matrix)<br>
+        5. Enforce symmetry: M_ij = M_ji = avg(M_ij, M_ji)
+      </div>
+      <div class="impact-box" style="margin-top:12px">
+        <span class="impact-icon">✓</span>
+        <div>
+          ถ้า matrix PSD อยู่แล้วจะ return ของเดิมเลย ไม่มี computational overhead
+          (<code>psdRepaired = false</code> ใน diagnostics)
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Diagnostics ที่ได้จาก buildConsistentCov()</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">Field</th>
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">ความหมาย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>minPairwiseOverlap</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">overlap ที่สั้นที่สุดในทุก pair (เดือน) — ยิ่งน้อย ยิ่ง uncertain</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>grain</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">'weekly' หรือ 'monthly' — 'monthly' แสดงว่ามี pair ที่ overlap สั้นมาก</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>zeroedPairs</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">จำนวน pair ที่ overlap ต่ำกว่า MIN_OBS → correlation ถูกตั้งเป็น 0</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>maxShrinkageDelta</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">δ สูงสุดที่ใช้ในทุก pair — &gt;0.5 หมายถึง shrinkage หนัก</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>psdRepaired</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">true ถ้า eigenvalue clipping ถูก trigger</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px"><code>historyMonths</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">{ fundName: เดือน } — history ของแต่ละกอง (1 decimal)</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px"><code>shortHistoryFunds</code></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">list ของกองที่มี history &lt; 24 เดือน พร้อมจำนวนเดือน</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Warning Banner ใน UI</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        หลัง run simulation ถ้า diagnostics แสดงว่ามี correlation estimate ที่ไม่น่าเชื่อถือ
+        จะแสดง banner เตือนผู้ใช้ที่ด้านบนของหน้า Results โดยอัตโนมัติ:
+      </p>
+      <div class="math-box">
+        trigger conditions (ข้อใดข้อหนึ่ง):<br>
+        • shortHistoryFunds.length &gt; 0 &nbsp;&nbsp;(มีกองที่มีข้อมูล &lt; 24 เดือน)<br>
+        • maxShrinkageDelta &gt; 0.5 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(shrinkage หนักมาก)<br>
+        • zeroedPairs &gt; 0 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(มี pair ที่ขาดข้อมูลเกินไป)
+      </div>
+      <p style="font-size:13px;color:var(--gray-700);margin-top:10px">
+        ข้อความ warning ระบุชื่อกองทุนที่สั้นและจำนวนเดือนที่แท้จริง
+        ไม่ใช่ข้อความ generic — เช่น
+        <em>"⚠️ ES-ULTIMATE-GA1 has only 13.5 months of history. In a 5-fund basket,
+        correlation estimates involving short-history funds are heavily regularised
+        toward zero…"</em>
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">สรุป Decision Tree</div>
+      <div class="math-box">
+        สำหรับแต่ละ pair (i, j):<br><br>
+        &nbsp;&nbsp;1. หา weekly overlap T_w<br>
+        &nbsp;&nbsp;2. ถ้า T_w ≥ 26 → ใช้ weekly, Tmonthly = T_w / 4.33<br>
+        &nbsp;&nbsp;3. ถ้า T_w &lt; 26 → ลอง monthly T_m<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ถ้า T_m ≥ 6  → ใช้ monthly, Tmonthly = T_m<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ถ้า T_m &lt; 6  → ρ_ij = 0 (zeroed pair)<br>
+        &nbsp;&nbsp;4. คำนวณ Pearson ρ จาก returns ที่ได้<br>
+        &nbsp;&nbsp;5. Shrink: ρ_shrunk = (1 − δ) · ρ  โดย δ = min(1, (N+1)/(Tmonthly−1))<br>
+        &nbsp;&nbsp;6. ใส่ ρ_shrunk ลงใน correlation matrix<br><br>
+        หลัง loop ทุก pair:<br>
+        &nbsp;&nbsp;7. PSD repair (ถ้า matrix ไม่ PSD)<br>
+        &nbsp;&nbsp;8. Rebuild: Σ_ij = ρ_ij · σ_i · σ_j
+      </div>
+
+      <!-- ── UL Product Constraints ────────────────────────────────────────── -->
+      <span id="ul-constraints"></span>
+      <div class="fix-section-label" style="margin-top:24px">UL Product Constraints และผลต่อ Shrinkage</div>
+      <p style="font-size:13px;color:var(--gray-700);line-height:1.7;margin-bottom:10px">
+        ผลิตภัณฑ์ Unit Linked นี้มี <strong>กฎ allocation</strong> ที่กำหนดโดย product rule:
+      </p>
+
+      <div class="two-col" style="margin-bottom:14px">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#1d4ed8;margin-bottom:6px">📦 จำนวนกองทุน</div>
+          เลือกได้ <strong>1–10 กอง</strong> ต่อกรมธรรม์<br>
+          <span style="color:var(--gray-500);font-size:12px">ไม่เกิน 10 กอง</span>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius);padding:12px 14px;font-size:13px">
+          <div style="font-weight:700;color:#15803d;margin-bottom:6px">📊 สัดส่วนการลงทุน</div>
+          แต่ละกองต้องได้รับ <strong>≥ 5%</strong> ของเบี้ย<br>
+          <span style="color:var(--gray-500);font-size:12px">เพื่อป้องกัน allocation ที่ไม่มีนัยสำคัญ</span>
+        </div>
+      </div>
+
+      <p style="font-size:13px;color:var(--gray-700);line-height:1.7;margin-bottom:10px">
+        กฎทั้งสองนี้มีผลโดยตรงต่อ <strong>ความน่าเชื่อถือของ covariance matrix</strong>
+        ที่ใช้ใน simulation ผ่านสมการ shrinkage:
+      </p>
+
+      <div class="math-box">
+        δ_ij = min(1, <strong>(N+1) / (T_monthly − 1)</strong>)<br><br>
+        N = จำนวนกองทุนที่ user เลือก &nbsp;&nbsp;<span style="color:#6c7086">← ถูก bound ด้วย product rule</span><br>
+        T_monthly = overlap เป็นเดือน<br><br>
+        ถ้า N ใหญ่เกินไป → δ → 1 → correlation ทุก pair ถูก shrink เข้าหา 0 ทั้งหมด<br>
+        ถ้า N ≤ 10 → δ อยู่ในช่วงที่สมเหตุสมผล
+      </div>
+
+      <p style="font-size:13px;color:var(--gray-700);margin-top:12px;margin-bottom:8px">
+        ตารางต่อไปนี้แสดงค่า δ สำหรับทุก combination ที่เป็นไปได้ภายใต้ product rule
+        โดยใช้ T ≈ 40 เดือน (กองทุนเปิดมาตั้งแต่ Dec 2022 ถึงปัจจุบัน):
+      </p>
+
+      <div style="overflow-x:auto;margin-bottom:14px">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="background:var(--gray-50);border-bottom:2px solid var(--gray-200)">
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">Basket (N)</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--gray-600)">T = 40 เดือน<br><span style="font-weight:400">(กองทุน Dec 2022)</span></th>
+              <th style="padding:8px 12px;text-align:center;color:var(--gray-600)">T = 13.5 เดือน<br><span style="font-weight:400">(ES-ULTIMATE GA)</span></th>
+              <th style="padding:8px 12px;text-align:left;color:var(--gray-600)">ความหมาย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">1 กอง <span style="color:var(--gray-400);font-weight:400">(min)</span></td>
+              <td style="padding:8px 12px;text-align:center;color:#15803d"><strong>—</strong></td>
+              <td style="padding:8px 12px;text-align:center;color:#15803d"><strong>—</strong></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">1×1 Cholesky — ไม่มี correlation</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">5 กอง</td>
+              <td style="padding:8px 12px;text-align:center;color:#15803d"><strong>0.15</strong></td>
+              <td style="padding:8px 12px;text-align:center;color:#b45309"><strong>0.48</strong></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">mild — เชื่อ sample ρ ~85%</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">7 กอง</td>
+              <td style="padding:8px 12px;text-align:center;color:#15803d"><strong>0.21</strong></td>
+              <td style="padding:8px 12px;text-align:center;color:#b45309"><strong>0.64</strong></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">moderate สำหรับ GA pairs</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:8px 12px;font-weight:600">10 กอง <span style="color:var(--gray-400);font-weight:400">(max)</span></td>
+              <td style="padding:8px 12px;text-align:center;color:#15803d"><strong>0.28</strong></td>
+              <td style="padding:8px 12px;text-align:center;color:#c2410c"><strong>0.89</strong></td>
+              <td style="padding:8px 12px;color:var(--gray-600)">heavy สำหรับ GA pairs — เกือบ zero</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          <strong>ทำไม 10-fund cap แก้ปัญหา N=79 ได้</strong><br>
+          ก่อนมี product rule ถ้า user เลือกทุกกองใน universe (84 กอง)
+          δ = (84+1)/(40−1) ≈ <strong>2.2 → clamp เป็น 1</strong>
+          — correlation ทุก pair ถูก zero out ทั้งหมด matrix กลายเป็น identity<br>
+          หลังมี 10-fund cap: δ สูงสุดคือ 0.28 สำหรับกองที่มีข้อมูลยาว
+          และ 0.89 เฉพาะ pair ที่มี ES-ULTIMATE GA — ซึ่งเป็น <em>behaviour ที่ถูกต้อง</em>
+          เพราะ GA มีข้อมูลแค่ 13.5 เดือนจริงๆ<br><br>
+          กรณี 1 กอง: degenerate เป็น 1×1 Cholesky (<code>L = [[σ]]</code>)
+          — ไม่มี correlation computation เลย ไม่กระทบ shrinkage
+        </div>
+      </div>
+
+      <div class="warn-box" style="margin-top:12px">
+        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div>
+          <strong>กฎ 5% min allocation ไม่กระทบ covariance math โดยตรง</strong><br>
+          กฎนี้เป็น portfolio construction constraint —
+          มั่นใจว่าทุกกองมี economic weight ≥ 5% แต่ไม่เปลี่ยนค่า N หรือ T ที่ใช้ใน shrinkage formula
+          ผลทางอ้อมคือป้องกัน token allocation (เช่น 0.1%) ที่ทำให้กองนั้นแทบไม่มีผลต่อพอร์ตแต่ยังบวม N
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -865,7 +1183,118 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════════
-       11. Limitations
+       11. Reproducibility
+  ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="fix-card" id="reproducibility">
+    <div class="fix-header">
+      <div>
+        <div class="fix-title">Reproducibility และ Seeded PRNG</div>
+        <div class="fix-file">simulation.js · mulberry32() · app.js · runMonteCarlo()</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <span class="badge badge-eng">Engineering</span>
+        <span class="badge badge-stats">Audit</span>
+      </div>
+    </div>
+    <div class="fix-body">
+
+      <div class="fix-section-label">Seeded PRNG — Mulberry32</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        Simulation ใช้ <strong>Mulberry32</strong> — PRNG แบบ 32-bit ที่ให้ sequence แบบ
+        deterministic จาก integer seed ใดๆ แทนการใช้ <code>Math.random()</code> ของ browser
+        ซึ่งไม่มี seed และ reproduce ไม่ได้
+      </p>
+      <pre><code><span class="cmt">// simulation.js — mulberry32 PRNG</span>
+<span class="kw">function</span> <span class="fn">mulberry32</span>(seed) {
+  <span class="kw">return function</span>() {
+    seed = (seed + <span class="num">0x6D2B79F5</span>) | <span class="num">0</span>;
+    <span class="kw">let</span> t = Math.<span class="fn">imul</span>(seed ^ (seed >>> <span class="num">15</span>), <span class="num">1</span> | seed);
+    <span class="cmt">// ... → ค่า float uniform [0, 1)</span>
+  };
+}</code></pre>
+      <p style="font-size:13px;color:var(--gray-700);margin-top:10px">
+        ข้อดีเหนือ <code>Math.random()</code>: ให้ output เดิม 100% เมื่อใช้ seed เดิม,
+        เร็ว (~3 ns/call), pass BigCrush statistical test suite
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">Per-Scenario Independence — seed + index</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        แต่ละ scenario สร้าง PRNG instance ของตัวเองโดยใช้ <code>seed + scenarioIndex</code>
+        ทำให้ scenario แต่ละตัวมี sequence อิสระจากกัน และ <strong>reproducible</strong>
+        — เพิ่ม N scenarios ทีหลังก็ไม่กระทบ sequence ของ scenarios ที่มีอยู่แล้ว
+      </p>
+      <pre><code><span class="cmt">// app.js / runMonteCarlo() — scenario loop</span>
+<span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; N; i++) {
+  <span class="kw">const</span> rng = <span class="fn">mulberry32</span>(seed + i); <span class="cmt">// seed+0, seed+1, seed+2, …</span>
+  <span class="kw">const</span> series = <span class="fn">runScenario</span>({ ..., rng });
+  <span class="cmt">// scenario i จะ identical ทุกครั้งที่ใช้ seed เดิม</span>
+}</code></pre>
+
+      <div class="math-box" style="margin-top:10px">
+        <strong>Property:</strong>&nbsp; f(seed, i) → sequence ที่ deterministic<br>
+        seed เดิม + index เดิม = <strong>ผล Monte Carlo เดิมทุก bit</strong>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Shared Seed ข้าม Rebalancing Modes</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        เมื่อ tool รัน 4 rebalancing frequencies พร้อมกัน (none / monthly / quarterly / annual)
+        ทั้ง 4 mode ใช้ <strong>seed เดียวกัน</strong>
+        ทำให้ random shocks ของแต่ละ scenario เหมือนกันทุกประการ —
+        ความแตกต่างของผลลัพธ์สะท้อน<em>เฉพาะผลของ rebalancing</em> ไม่ใช่ความผันแปรจากการสุ่ม
+      </p>
+      <pre><code><span class="cmt">// app.js — seed เดียวส่งให้ทุก mode</span>
+<span class="kw">const</span> seed = Date.<span class="fn">now</span>(); <span class="cmt">// สร้างครั้งเดียวก่อน loop</span>
+<span class="kw">for</span> (<span class="kw">const</span> mode <span class="kw">of</span> [<span class="str">'none'</span>, <span class="str">'monthly'</span>, <span class="str">'quarterly'</span>, <span class="str">'annual'</span>]) {
+  allResults[mode] = <span class="kw">await</span> <span class="fn">runMonteCarlo</span>({ ..., rebalanceMode: mode, seed });
+}</code></pre>
+      <div class="impact-box">
+        <span class="impact-icon">✓</span>
+        <div>
+          วิธีนี้ทำให้ตาราง "เปรียบเทียบความถี่ rebalancing"
+          เป็น <strong>controlled experiment</strong> — variance จากการสุ่มถูก eliminate
+          ความต่างที่เห็นในตารางคือ causal effect ของ rebalancing ล้วนๆ
+        </div>
+      </div>
+
+      <div class="fix-section-label" style="margin-top:16px">Default Seed — Date.now()</div>
+      <p style="font-size:13px;color:var(--gray-700)">
+        ค่า default ของ seed คือ <code>Date.now()</code> ณ เวลาที่กด Run
+        ทำให้แต่ละ run ได้ผลต่างกัน (ซึ่งเป็น behavior ที่ถูกต้องสำหรับ Monte Carlo)
+        แต่ถ้าต้องการ reproduce run เดิมทุกครั้ง สามารถกำหนด seed เป็นค่าคงที่ได้
+      </p>
+
+      <div class="fix-section-label" style="margin-top:16px">วิธี Reproduce Run — Audit Use Case</div>
+      <p style="font-size:13px;color:var(--gray-700);margin-bottom:8px">
+        ถ้าต้องการ reproduce ผลการ simulation ที่รันไปแล้ว (เช่น เพื่อ audit หรือ present ซ้ำ)
+        ให้แก้ค่า seed ใน <code>js/app.js</code> เป็น integer คงที่:
+      </p>
+      <pre><code><span class="cmt">// js/app.js — แก้บรรทัดนี้</span>
+<span class="kw">const</span> seed = Date.<span class="fn">now</span>();   <span class="cmt">// ← default: ต่างทุก run</span>
+
+<span class="cmt">// เปลี่ยนเป็น:</span>
+<span class="kw">const</span> seed = <span class="num">1714000000000</span>; <span class="cmt">// ← fixed seed → reproducible ทุก run</span></code></pre>
+
+      <div class="math-box" style="margin-top:10px">
+        <strong>Reproducibility guarantee:</strong><br>
+        seed เดิม + N เดิม + config เดิม → P25/P50/P75/P98 และ mean series <strong>เหมือนกันทุก bit</strong><br>
+        ไม่มีแหล่ง non-determinism อื่นใน simulation path
+      </div>
+
+      <div class="warn-box" style="margin-top:14px">
+        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <div>
+          <strong>ขณะนี้ seed ยังไม่แสดงใน UI</strong><br>
+          ถ้าต้องการ log seed ของแต่ละ run เพื่อ full audit trail
+          ให้เพิ่ม <code>console.log('seed:', seed)</code> หรือแสดงใน result panel
+          (planned feature)
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       12. Limitations
   ══════════════════════════════════════════════════════════════════════════ -->
   <div class="fix-card" id="limits">
     <div class="fix-header">

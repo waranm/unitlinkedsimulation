@@ -15,6 +15,8 @@
 
 'use strict';
 
+// Requires cov-builder.js to be loaded before this file.
+
 // ─── Stats helpers ───────────────────────────────────────────────────────────
 
 /**
@@ -126,116 +128,6 @@ function calcFundStats(navData) {
   return stats;
 }
 
-// ─── Aligned monthly returns ──────────────────────────────────────────────────
-
-/**
- * Forward-fill (LOCF) and backfill-at-inception a YYYY-MM → NAV map so that
- * every month in `allMonths` has a value.
- *
- * - Months before the fund's first data point → filled with the first known NAV
- *   (inception backfill, keeps matrix dimensions equal across funds).
- * - Months after a fund's last data point or internal holiday gaps → filled
- *   with the last known NAV (LOCF / forward fill).
- *
- * @param {Map<string,number>} monthMap  raw YYYY-MM → NAV for one fund
- * @param {string[]}           allMonths sorted list of all months in the union
- * @returns {Map<string,number>}         fully-filled map, no missing months
- */
-function fillMonthlyGaps(monthMap, allMonths) {
-  // Find the first recorded value (needed for inception backfill)
-  let firstKnown = null;
-  for (const m of allMonths) {
-    if (monthMap.has(m)) { firstKnown = monthMap.get(m); break; }
-  }
-  if (firstKnown === null) return monthMap; // fund has no data at all
-
-  const filled = new Map();
-  let lastKnown = null;
-  for (const m of allMonths) {
-    if (monthMap.has(m)) {
-      lastKnown = monthMap.get(m);
-      filled.set(m, lastKnown);
-    } else {
-      // Before inception: backfill with first known; after inception: LOCF
-      filled.set(m, lastKnown !== null ? lastKnown : firstKnown);
-    }
-  }
-  return filled;
-}
-
-/**
- * For every fund in navData, build a YYYY-MM → NAV map (end-of-month value),
- * then align across all funds using the UNION of all months (not intersection).
- * Missing months are filled via LOCF (forward) or inception backfill (backward)
- * so that every fund has a value in every month of the union.
- *
- * @param {Object} navData  { fundName: [{ date: Date, nav }] }
- * @returns {{
- *   fundOrder: string[],   fund names — row order of the return matrix
- *   returns:  number[][],  [fundIdx][periodIdx] aligned monthly log-returns
- * }}
- */
-function getAlignedMonthlyReturns(navData) {
-  const fundOrder = Object.keys(navData);
-
-  // Build YYYY-MM → NAV map per fund (last row of each month wins)
-  const monthMaps = fundOrder.map(f => {
-    const m = new Map();
-    for (const row of navData[f]) {
-      const key = `${row.date.getFullYear()}-${String(row.date.getMonth() + 1).padStart(2, '0')}`;
-      m.set(key, row.nav);
-    }
-    return m;
-  });
-
-  // Union of all months present across any fund
-  const allMonthsSet = new Set();
-  for (const m of monthMaps) for (const k of m.keys()) allMonthsSet.add(k);
-  const allMonths = Array.from(allMonthsSet).sort();
-
-  // Fill each fund's map so every month in the union has a value
-  const filledMaps = monthMaps.map(m => fillMonthlyGaps(m, allMonths));
-
-  // Log-return matrix over the full union timeline
-  const returns = fundOrder.map((_, fi) => {
-    const out = [];
-    for (let t = 1; t < allMonths.length; t++) {
-      const prev = filledMaps[fi].get(allMonths[t - 1]);
-      const curr = filledMaps[fi].get(allMonths[t]);
-      const r = Math.log(curr / prev);
-      out.push(isFinite(r) ? r : 0);
-    }
-    return out;
-  });
-
-  return { fundOrder, returns };
-}
-
-// ─── Covariance matrix ────────────────────────────────────────────────────────
-
-/**
- * Sample covariance matrix (divides by T−1) from aligned return series.
- * @param {number[][]} returns  [fundIdx][periodIdx]
- * @returns {number[][]}        n×n symmetric covariance matrix
- */
-function computeCovMatrix(returns) {
-  const n = returns.length;
-  const T = returns[0].length;
-  const means = returns.map(r => r.reduce((a, b) => a + b, 0) / T);
-
-  const cov = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = i; j < n; j++) {
-      let sum = 0;
-      for (let t = 0; t < T; t++) {
-        sum += (returns[i][t] - means[i]) * (returns[j][t] - means[j]);
-      }
-      cov[i][j] = cov[j][i] = sum / (T - 1);
-    }
-  }
-  return cov;
-}
-
 // ─── Cholesky decomposition ───────────────────────────────────────────────────
 
 /**
@@ -326,25 +218,15 @@ function sampleFromCDF(probs, rng) {
  */
 function calcSimParams(navData) {
   const fundStats = calcFundStats(navData);
-  const funds = Object.keys(navData);
+  const fundOrder = Object.keys(navData);
 
-  // Single fund — degenerate 1×1 Cholesky
-  if (funds.length === 1) {
-    return { fundStats, fundOrder: funds, choleskyL: [[fundStats[funds[0]].std]] };
+  if (fundOrder.length === 1) {
+    return { fundStats, fundOrder, choleskyL: [[fundStats[fundOrder[0]].std]], covDiagnostics: null };
   }
 
-  const { fundOrder, returns } = getAlignedMonthlyReturns(navData);
-  const T = returns[0].length;
-
-  // Need at least 2 aligned periods to estimate covariance
-  if (T < 2) {
-    const L = funds.map((f, i) => funds.map((_, j) => i === j ? fundStats[f].std : 0));
-    return { fundStats, fundOrder: funds, choleskyL: L };
-  }
-
-  const covMatrix = computeCovMatrix(returns);
-  const L = cholesky(covMatrix);
-  return { fundStats, fundOrder, choleskyL: L };
+  const { cov, diagnostics } = buildConsistentCov(navData, fundOrder, fundStats);
+  const choleskyL = cholesky(cov);
+  return { fundStats, fundOrder, choleskyL, covDiagnostics: diagnostics };
 }
 
 /**
@@ -644,7 +526,7 @@ async function runMonteCarlo(config, onProgress) {
   // Pre-compute stationary distribution once — shared across all scenarios
   const stationaryDist = regimeSwitching ? computeStationaryDist(transitionMatrix) : [];
 
-  const { fundStats, fundOrder, choleskyL } = calcSimParams(navData);
+  const { fundStats, fundOrder, choleskyL, covDiagnostics } = calcSimParams(navData);
   const funds = fundOrder;
 
   // Normalise allocation to fractions
@@ -704,5 +586,5 @@ async function runMonteCarlo(config, onProgress) {
     }
   }
 
-  return { percentiles, months, meanSeries };
+  return { percentiles, months, meanSeries, covDiagnostics };
 }

@@ -524,10 +524,31 @@ function buildAllocationTable() {
 }
 
 function updateAllocTotal() {
-  const total = Object.values(state.allocation).reduce((s, v) => s + v, 0);
+  // Sum only current funds (prevents stale keys from blowing past 100%)
+  const total = state.fundNames.reduce((s, f) => s + (state.allocation[f] || 0), 0);
   const el = document.getElementById('allocTotal');
   el.textContent = `รวม: ${total.toFixed(2)}%`;
   el.className = 'alloc-total ' + (Math.abs(total - 100) < 0.01 ? 'ok' : 'err');
+
+  const warnings = [];
+
+  const activeFunds = state.fundNames.filter(f => (state.allocation[f] || 0) > 0);
+  if (activeFunds.length > 10) {
+    warnings.push(`⚠️ เลือกได้สูงสุด 10 กองทุน (ปัจจุบัน: ${activeFunds.length} กองทุน)`);
+  }
+
+  const underMin = state.fundNames.filter(f => {
+    const v = state.allocation[f] || 0;
+    return v > 0 && v < 5;
+  });
+  if (underMin.length > 0) {
+    warnings.push(`⚠️ แต่ละกองทุนต้องมีสัดส่วนอย่างน้อย 5% (หรือ 0% เพื่อข้าม): ${underMin.join(', ')}`);
+  }
+
+  const warnEl = document.getElementById('allocWarnings');
+  if (warnEl) {
+    warnEl.innerHTML = warnings.map(w => `<div class="alloc-warning">${w}</div>`).join('');
+  }
 }
 
 document.getElementById('btnNext2').addEventListener('click', () => {
@@ -536,10 +557,25 @@ document.getElementById('btnNext2').addEventListener('click', () => {
   state.N                = parseInt(document.getElementById('inputN').value) || 1000;
 
   if (!state.selectedPeriod) { alert('กรุณาเลือกระยะเวลา Simulation'); return; }
-  const allocTotal = Object.values(state.allocation).reduce((s, v) => s + v, 0);
+
+  const allocTotal = state.fundNames.reduce((s, f) => s + (state.allocation[f] || 0), 0);
   if (Math.abs(allocTotal - 100) > 0.01) {
     alert('การจัดสรรสินทรัพย์ต้องรวมเป็น 100% (ปัจจุบัน: ' + allocTotal.toFixed(2) + '%)'); return;
   }
+
+  const underMin = state.fundNames.filter(f => { const v = state.allocation[f] || 0; return v > 0 && v < 5; });
+  if (underMin.length > 0) {
+    alert('แต่ละกองทุนต้องมีสัดส่วนอย่างน้อย 5% (หรือ 0% เพื่อข้าม)\nกองทุนที่มีปัญหา: ' + underMin.join(', ')); return;
+  }
+
+  const activeFunds = state.fundNames.filter(f => (state.allocation[f] || 0) > 0);
+  if (activeFunds.length > 10) {
+    alert('เลือกได้สูงสุด 10 กองทุน (ปัจจุบัน: ' + activeFunds.length + ' กองทุน)'); return;
+  }
+  if (activeFunds.length === 0) {
+    alert('กรุณาระบุสัดส่วนอย่างน้อย 1 กองทุน'); return;
+  }
+
   if (state.premium < 1000 || state.premium > 100000) {
     alert('เบี้ยประกันต้องอยู่ระหว่าง 1,000 - 100,000 บาท'); return;
   }
@@ -547,6 +583,10 @@ document.getElementById('btnNext2').addEventListener('click', () => {
 });
 
 document.getElementById('btnBack2').addEventListener('click', () => goToStep(0));
+
+document.getElementById('btnResetAlloc').addEventListener('click', () => {
+  buildAllocationTable();
+});
 
 // ─── Step 3: Run ──────────────────────────────────────────────────────────────
 document.getElementById('btnRun').addEventListener('click', runSimulation);
@@ -702,6 +742,19 @@ function fmtIRR(irr) {
 function buildResultsStep() {
   document.querySelector('.pct-options').style.display         = '';
   document.getElementById('rebalCompareInsight').style.display = state.isSingleFund ? 'none' : '';
+
+  const covBanner = document.getElementById('covWarningBanner');
+  if (covBanner) {
+    const bestResult = state.allResults[state.recommendedMode] || state.allResults['none'];
+    const diag = bestResult && bestResult.covDiagnostics;
+    const msg = diag ? buildCovWarningMessage(diag, Object.keys(state.navData).length) : null;
+    if (msg) {
+      covBanner.innerHTML = `<div class="alloc-warning">${msg}</div>`;
+      covBanner.style.display = '';
+    } else {
+      covBanner.style.display = 'none';
+    }
+  }
 
   renderOutcomeSummary();
 
