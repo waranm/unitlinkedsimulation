@@ -809,10 +809,17 @@ async function runSimulation() {
     document.getElementById('progressText').textContent = Math.round(pct) + '%';
   }
 
+  const { getProduct, getCoverageMonths, getPremiumPaymentMonths } = window.ProductLib;
+  const _product = getProduct(state.product.id);
+  const _covMonths = getCoverageMonths(_product, state.product.age);
+  const _pptMonths = getPremiumPaymentMonths(_product, state.product.age);
+  const simMonths = (_covMonths !== null) ? _covMonths : state.selectedPeriod;
+
   const baseConfig = {
     navData: state.navData, allocation: state.allocation,
     premium: state.premium, paymentMode: state.paymentMode,
-    months: state.selectedPeriod, N: state.N, feeParams: {},
+    months: simMonths, N: state.N, feeParams: {},
+    premiumPaymentMonths: _pptMonths,
     product: state.product,
     regimeSwitching: true,
     regimes: [
@@ -1100,6 +1107,7 @@ async function runSimulation() {
 
   try {
     const seed       = Date.now();
+    state.lastRun    = { seed, pptMonths: _pptMonths };
     const allResults = {};
 
     if (isSingleFund) {
@@ -1144,12 +1152,14 @@ async function runSimulation() {
 
 // ─── Step 4: Results helpers ──────────────────────────────────────────────────
 
-/** Total premium paid over the simulation period. */
+/** Total premium paid over the simulation period (capped by PPT for UL products). */
 function simTotalPremium() {
   const step = simPaymentStep();
   const { months } = state.results;
+  const pptMonths = state.lastRun && state.lastRun.pptMonths;
+  const limit = (pptMonths != null) ? Math.min(months, pptMonths) : months;
   let n = 0;
-  for (let m = 0; m < months; m += step) n++;
+  for (let m = 0; m < limit; m += step) n++;
   return state.premium * n;
 }
 
@@ -1438,7 +1448,8 @@ document.getElementById('btnExportCSV').addEventListener('click', () => {
   exportSummaryCSV(
     state.results.percentiles, state.results.months,
     { premium: state.premium, paymentMode: state.paymentMode,
-      months: state.results.months, rebalanceMode: state.recommendedMode, N: state.N },
+      months: state.results.months, rebalanceMode: state.recommendedMode, N: state.N,
+      pptMonths: state.lastRun && state.lastRun.pptMonths },
     state.selectedPcts
   );
 });
