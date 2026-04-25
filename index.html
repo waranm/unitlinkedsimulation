@@ -159,6 +159,59 @@
   <!-- ── STEP 2: Parameters ──────────────────────────────────────────────── -->
   <div class="section" id="step-params">
 
+    <!-- Policy Info -->
+    <div class="card" id="policyInfoCard">
+      <div class="card-title"><span class="icon">📄</span> ข้อมูลกรมธรรม์</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="productSelect">เลือกกรมธรรม์</label>
+          <select id="productSelect">
+            <!-- populated by JS -->
+          </select>
+        </div>
+      </div>
+
+      <div id="policyholderInputs" style="display:none">
+        <div class="form-grid" style="margin-top:12px">
+          <div class="form-group">
+            <label for="userAge">อายุผู้เอาประกัน</label>
+            <input type="number" id="userAge" min="0" max="99" value="30" />
+          </div>
+          <div class="form-group">
+            <label>เพศ</label>
+            <div style="display:flex;gap:16px;align-items:center;padding-top:6px">
+              <label style="font-weight:400;display:flex;gap:6px;align-items:center">
+                <input type="radio" name="gender" value="male" checked /> ชาย
+              </label>
+              <label style="font-weight:400;display:flex;gap:6px;align-items:center">
+                <input type="radio" name="gender" value="female" /> หญิง
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid" id="saInputRow" style="display:none;margin-top:4px">
+          <div class="form-group">
+            <label for="saMultiplier">ตัวคูณความคุ้มครอง (Sum Assured)</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="number" id="saMultiplier" min="1" step="1" style="width:120px" />
+              <span style="color:var(--gray-600);font-size:14px">× เบี้ยรายปี</span>
+            </div>
+            <span class="form-hint" id="saHint"></span>
+            <div id="saComputed" style="display:none;margin-top:4px;color:var(--primary);font-weight:600;font-size:14px"></div>
+            <div id="saError" style="display:none;margin-top:4px;color:#dc2626;font-size:13px"></div>
+          </div>
+        </div>
+
+        <div class="info-box" id="productInfo" style="margin-top:12px;display:none"></div>
+      </div>
+
+      <details id="feeSummary" style="display:none;margin-top:12px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--gray-600)">รายละเอียดค่าธรรมเนียม</summary>
+        <div id="feeDetails" style="margin-top:8px;font-size:13px;color:var(--gray-700);line-height:1.7"></div>
+      </details>
+    </div>
+
     <!-- Premium & Payment -->
     <div class="card">
       <div class="card-title"><span class="icon">💰</span> เบี้ยประกันและรูปแบบการชำระ</div>
@@ -181,8 +234,8 @@
     </div>
 
     <!-- Simulation Period -->
-    <div class="card">
-      <div class="card-title"><span class="icon">📅</span> ระยะเวลาลงทุน</div>
+    <div class="card" id="durationCard">
+      <div class="card-title"><span class="icon">📅</span> ระยะเวลา</div>
       <div class="period-options" id="periodOptions"></div>
       <div class="info-box" id="jointInfo" style="display:none"></div>
     </div>
@@ -328,6 +381,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
 <!-- App modules -->
+<script src="js/products/index.js"></script>
 <script src="js/cov-builder.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/charts.js"></script>
