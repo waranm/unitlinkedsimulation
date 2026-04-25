@@ -1276,7 +1276,7 @@ function renderRebalCompareInsight() {
   const rows = MODES.map(mode => {
     const p50    = cr[mode].percentiles[50][months - 1];
     const profit = p50 - totalPaid;
-    const irr    = calcIRR(state.premium, step, months, p50);
+    const irr    = calcIRR(state.premium, step, months, p50, state.lastRun && state.lastRun.pptMonths);
     return { mode, p50, profit, irr };
   });
 
@@ -1335,9 +1335,10 @@ function renderOutcomeSummary() {
   const p50Final = percentiles[50][months - 1];
   const p25Final = percentiles[25][months - 1];
 
-  const p75IRR = calcIRR(state.premium, step, months, p75Final);
-  const p50IRR = calcIRR(state.premium, step, months, p50Final);
-  const p25IRR = calcIRR(state.premium, step, months, p25Final);
+  const _ppt = state.lastRun && state.lastRun.pptMonths;
+  const p75IRR = calcIRR(state.premium, step, months, p75Final, _ppt);
+  const p50IRR = calcIRR(state.premium, step, months, p50Final, _ppt);
+  const p25IRR = calcIRR(state.premium, step, months, p25Final, _ppt);
 
   function irrCls(irr) { return irr === null ? '' : irr >= 0 ? 'positive' : 'negative'; }
 
@@ -1405,7 +1406,7 @@ function buildSummaryTable() {
     // IRR: annualised money-weighted return accounting for DCA timing
     let cagrStr = '-';
     if (final > 0 && totalPremium > 0 && years > 0) {
-      const irr = calcIRR(state.premium, step, months, final);
+      const irr = calcIRR(state.premium, step, months, final, state.lastRun && state.lastRun.pptMonths);
       if (irr !== null) cagrStr = fmtIRR(irr);
     }
 
