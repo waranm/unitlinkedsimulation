@@ -275,13 +275,17 @@ function randNormal(rng) {
  * @param {number} finalValue portfolio value at end of simulation
  * @returns {number|null}     annualised IRR in percent, or null if indeterminate
  */
-function calcIRR(premium, step, months, finalValue) {
+function calcIRR(premium, step, months, finalValue, pptMonths = null) {
   if (finalValue <= 0 || premium <= 0 || months <= 0) return null;
+
+  // For limited-pay products, premium is paid only for the first pptMonths.
+  // Cash outflow timing affects IRR — capping is essential.
+  const premiumLimit = (pptMonths != null) ? Math.min(months, pptMonths) : months;
 
   // FV of all premiums valued at month `months`, at monthly rate r
   function fv(r) {
     let sum = 0;
-    for (let m = 0; m < months; m += step) {
+    for (let m = 0; m < premiumLimit; m += step) {
       sum += premium * Math.pow(1 + r, months - m);
     }
     return sum;
