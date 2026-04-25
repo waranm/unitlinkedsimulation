@@ -37,6 +37,13 @@ const state = {
   compareResults: null,     // { monthly, quarterly, annual } — cached when compare mode runs
 
   loadedFundIds: new Set(), // codes currently loaded from fund library
+
+  product: {
+    id: "INVESTMENT-ONLY",
+    age: 30,
+    gender: "male",
+    sumAssuredMultiplier: null
+  }
 };
 
 // ─── Step management ─────────────────────────────────────────────────────────
@@ -424,8 +431,184 @@ document.getElementById('btnNext1').addEventListener('click', () => {
 
 // ─── Step 2: Parameters ───────────────────────────────────────────────────────
 function buildParamsStep() {
+  buildProductUI();
   buildPeriodOptions();
   buildAllocationTable();
+}
+
+function buildProductUI() {
+  const { PRODUCTS, getProduct, isInvestmentOnly, getSAMultiplierRange,
+          validateSAMultiplier, computeSumAssured, getPremiumPaymentMonths,
+          getCoverageMonths } = window.ProductLib;
+
+  const sel = document.getElementById('productSelect');
+  if (!sel.options.length) {
+    Object.values(PRODUCTS).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.displayName;
+      sel.appendChild(opt);
+    });
+    sel.value = state.product.id;
+    sel.addEventListener('change', () => {
+      state.product.id = sel.value;
+      state.product.sumAssuredMultiplier = null;
+      document.getElementById('saMultiplier').value = '';
+      refreshProductUI();
+    });
+  }
+
+  document.getElementById('userAge').addEventListener('change', () => {
+    state.product.age = parseInt(document.getElementById('userAge').value) || 30;
+    state.product.sumAssuredMultiplier = null;
+    document.getElementById('saMultiplier').value = '';
+    refreshProductUI();
+  });
+
+  document.querySelectorAll('input[name="gender"]').forEach(r => {
+    r.addEventListener('change', () => {
+      state.product.gender = r.value;
+      state.product.sumAssuredMultiplier = null;
+      document.getElementById('saMultiplier').value = '';
+      refreshProductUI();
+    });
+  });
+
+  document.getElementById('saMultiplier').addEventListener('input', () => {
+    const v = parseFloat(document.getElementById('saMultiplier').value);
+    state.product.sumAssuredMultiplier = isNaN(v) ? null : v;
+    refreshProductUI();
+  });
+
+  document.getElementById('inputPremium').addEventListener('input', () => {
+    state.premium = parseFloat(document.getElementById('inputPremium').value) || 5000;
+    refreshProductUI();
+  });
+
+  document.getElementById('selectPayment').addEventListener('change', () => {
+    state.paymentMode = document.getElementById('selectPayment').value;
+    refreshProductUI();
+  });
+
+  refreshProductUI();
+}
+
+function refreshProductUI() {
+  const { getProduct, isInvestmentOnly, getSAMultiplierRange,
+          validateSAMultiplier, computeSumAssured,
+          getPremiumPaymentMonths, getCoverageMonths } = window.ProductLib;
+
+  const product = getProduct(state.product.id);
+  const isInvOnly = isInvestmentOnly(product);
+  const { age, gender, sumAssuredMultiplier } = state.product;
+
+  // Show/hide policyholder inputs
+  document.getElementById('policyholderInputs').style.display = isInvOnly ? 'none' : '';
+
+  // Show/hide duration card
+  document.getElementById('durationCard').style.display = isInvOnly ? '' : 'none';
+
+  // Show/hide fee summary
+  const feeSummaryEl = document.getElementById('feeSummary');
+  feeSummaryEl.style.display = isInvOnly ? 'none' : '';
+  if (!isInvOnly) renderFeeDetails(product);
+
+  if (isInvOnly) {
+    updateNextButton();
+    return;
+  }
+
+  // SA input row
+  const needsSA = product.sumAssured.type === "user-selectable";
+  document.getElementById('saInputRow').style.display = needsSA ? '' : 'none';
+
+  if (needsSA) {
+    const range = getSAMultiplierRange(product, age, gender);
+    const saMultiplierEl = document.getElementById('saMultiplier');
+    const saHintEl = document.getElementById('saHint');
+    const saComputedEl = document.getElementById('saComputed');
+    const saErrorEl = document.getElementById('saError');
+    const genderLabel = gender === 'male' ? 'ชาย' : 'หญิง';
+
+    if (!range) {
+      saHintEl.textContent = 'อายุเกินเงื่อนไขการรับประกัน';
+      saMultiplierEl.disabled = true;
+      saComputedEl.style.display = 'none';
+      saErrorEl.style.display = 'none';
+    } else {
+      saMultiplierEl.disabled = false;
+      saHintEl.textContent = `กรอกตัวเลข ${range.min}–${range.max} สำหรับอายุ ${age} ${genderLabel}`;
+
+      const validation = validateSAMultiplier(product, age, gender, sumAssuredMultiplier);
+      if (!validation.valid) {
+        saErrorEl.textContent = validation.reason;
+        saErrorEl.style.display = sumAssuredMultiplier != null && sumAssuredMultiplier !== '' ? '' : 'none';
+        saComputedEl.style.display = 'none';
+      } else {
+        saErrorEl.style.display = 'none';
+        const freqMap = { monthly: 12, quarterly: 4, 'semi-annual': 2, annual: 1 };
+        const freqLabel = { monthly: 'รายเดือน', quarterly: 'รายไตรมาส', 'semi-annual': 'ราย 6 เดือน', annual: 'รายปี' };
+        const mode = state.paymentMode || 'monthly';
+        const freq = freqMap[mode];
+        const premium = state.premium || 5000;
+        const annualPremium = premium * freq;
+        const sa = computeSumAssured(product, annualPremium, sumAssuredMultiplier);
+        saComputedEl.innerHTML =
+          `<span style="color:var(--gray-600);font-weight:400;font-size:13px">` +
+          `฿${premium.toLocaleString('th-TH')} (${freqLabel[mode]}) × ${freq} งวด/ปี × ${sumAssuredMultiplier} = </span>` +
+          `฿${sa.toLocaleString('th-TH')}`;
+        saComputedEl.style.display = '';
+      }
+    }
+  }
+
+  // Product info block (PPT + sim duration)
+  const infoEl = document.getElementById('productInfo');
+  const pptMonths = getPremiumPaymentMonths(product, age);
+  const covMonths = getCoverageMonths(product, age);
+  if (pptMonths != null && covMonths != null) {
+    const pptYears = Math.round(pptMonths / 12);
+    const covYears = Math.round(covMonths / 12);
+    infoEl.innerHTML = pptYears === covYears
+      ? `📋 จ่ายเบี้ย ${pptYears} ปี | ระยะเวลาความคุ้มครอง ${covYears} ปี (อายุ ${age}–99)`
+      : `📋 จ่ายเบี้ย ${pptYears} ปี (อายุ ${age}–${age + pptYears})<br>📋 ระยะเวลาความคุ้มครอง ${covYears} ปี (อายุ ${age}–99)`;
+    infoEl.style.display = '';
+  } else {
+    infoEl.style.display = 'none';
+  }
+
+  updateNextButton();
+}
+
+function renderFeeDetails(product) {
+  const { isInvestmentOnly } = window.ProductLib;
+  if (isInvestmentOnly(product)) return;
+  const rates = product.premiumCharge.rates;
+  const premChargeDisplay = Object.entries(rates)
+    .map(([year, rate]) => `ปี ${year}: ${(rate * 100).toFixed(0)}%`)
+    .join(', ');
+  document.getElementById('feeDetails').innerHTML = `
+    <p><strong>Premium Charge:</strong> ${premChargeDisplay} (ปีอื่นไม่มี)</p>
+    <p><strong>Admin Fee:</strong> ${(product.adminFee.rate * 100 * 12).toFixed(2)}% ต่อปี ของ AUM (${(product.adminFee.rate * 100).toFixed(4)}%/เดือน)</p>
+    <p><strong>COI:</strong> ${product.coi.tableId} (basis: ${product.coi.basis}, loading: ${product.coi.loadingFactor}×)</p>
+    <p class="form-hint">⚠️ COI loading factor = 1.0 (placeholder) — pending insurer confirmation</p>
+  `;
+}
+
+function canRunSimulation() {
+  const { getProduct, validateSAMultiplier } = window.ProductLib;
+  const product = getProduct(state.product.id);
+  if (product.sumAssured.type === "user-selectable") {
+    const { age, gender, sumAssuredMultiplier } = state.product;
+    const v = validateSAMultiplier(product, age, gender, sumAssuredMultiplier);
+    if (!v.valid) return false;
+  }
+  return true;
+}
+
+function updateNextButton() {
+  const btn = document.getElementById('btnNext2');
+  if (btn) btn.disabled = !canRunSimulation();
 }
 
 function buildPeriodOptions() {
@@ -630,6 +813,7 @@ async function runSimulation() {
     navData: state.navData, allocation: state.allocation,
     premium: state.premium, paymentMode: state.paymentMode,
     months: state.selectedPeriod, N: state.N, feeParams: {},
+    product: state.product,
     regimeSwitching: true,
     regimes: [
       {
