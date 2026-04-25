@@ -59,11 +59,12 @@ function exportSummaryCSV(percentiles, months, params, selected) {
 }
 
 function calcTotalPremiumPaid(params) {
-  const { premium, paymentMode, months } = params;
+  const { premium, paymentMode, months, pptMonths = null } = params;
   const intervals = { monthly: 1, quarterly: 3, 'semi-annual': 6, annual: 12 };
   const step = intervals[paymentMode] || 1;
+  const limit = (pptMonths != null) ? Math.min(months, pptMonths) : months;
   let count = 0;
-  for (let m = 0; m < months; m += step) count++;
+  for (let m = 0; m < limit; m += step) count++;
   return premium * count;
 }
 

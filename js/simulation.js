@@ -488,11 +488,12 @@ function runScenario(params) {
  * @param {'monthly'|'quarterly'|'semi-annual'|'annual'} mode
  * @param {number} totalMonths
  */
-function buildPremiumMonths(mode, totalMonths) {
+function buildPremiumMonths(mode, totalMonths, pptMonths = null) {
+  const limit = (pptMonths !== null) ? Math.min(totalMonths, pptMonths) : totalMonths;
   const set = new Set();
   const intervals = { monthly: 1, quarterly: 3, 'semi-annual': 6, annual: 12 };
   const step = intervals[mode] || 1;
-  for (let m = 0; m < totalMonths; m += step) set.add(m);
+  for (let m = 0; m < limit; m += step) set.add(m);
   return set;
 }
 
@@ -518,6 +519,7 @@ async function runMonteCarlo(config, onProgress) {
     navData, allocation, premium, paymentMode,
     months, rebalanceMode, N, feeParams = {},
     seed = Date.now(),
+    premiumPaymentMonths = null,
     regimeSwitching = false,
     regimes = [],
     transitionMatrix = []
@@ -541,7 +543,7 @@ async function runMonteCarlo(config, onProgress) {
     initialNav[f] = rows[rows.length - 1].nav;
   }
 
-  const premiumMonths = buildPremiumMonths(paymentMode, months);
+  const premiumMonths = buildPremiumMonths(paymentMode, months, premiumPaymentMonths);
   const allSeries = [];
 
   const BATCH = 100;

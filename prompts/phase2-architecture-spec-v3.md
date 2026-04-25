@@ -138,6 +138,15 @@ js/
 - What-if inputs (atAge, newMultiplier)
 - "รันใหม่ด้วยตัวเลขสุ่มชุดเดิม" button reuses state.lastRun.seed (existing PRNG)
 - Comparison table (baseline vs modified)
+- **TPP (Total Premium Paid) overlay line on chart** — visualizes break-even point where
+  portfolio crosses cumulative paid-in. For UL-10-99: rising 0→600K over 10 yr, then flat;
+  makes PPT cap visible at a glance. For INVESTMENT-ONLY/UL-99-99: monotonic rising line.
+  Source: cumulative `state.premium × paymentsTakenSoFar` capped by `pptMonths`.
+- **Fix duplicate "ถัดไป: ตั้งค่า →" button on Step 1** — both `flBtnProceed`
+  ([index.html:116](index.html:116)) and `btnNext1` ([index.html:122](index.html:122)) render.
+  Pre-existing UI bug surfaced during Phase 2a.5 testing; cosmetic, both work. Decide which
+  to keep (likely `flBtnProceed` since it lives in the fund-library card context) and
+  remove the other.
 
 ## Monthly fee timing (CRITICAL for Phase 2b/2c)
 
