@@ -19,6 +19,9 @@ const vm   = require('vm');
 // simulation.js defines globals (no exports), so we use vm.runInContext to
 // pull all its functions into a plain object we can destructure.
 
+const feesCode = fs.readFileSync(
+  path.join(__dirname, '../js/fees.js'), 'utf8'
+);
 const simCode = fs.readFileSync(
   path.join(__dirname, '../js/simulation.js'), 'utf8'
 );
@@ -29,7 +32,8 @@ const simCtx = vm.createContext({
   Promise, setTimeout, clearTimeout,
   console,
 });
-vm.runInContext(simCode, simCtx);
+vm.runInContext(feesCode, simCtx);   // fees.js declares global applyFees
+vm.runInContext(simCode, simCtx);    // simulation.js calls applyFees
 
 const {
   runScenario, runMonteCarlo,
@@ -115,7 +119,7 @@ function runN(N, { fundStats, fundOrder, choleskyL, mean = 0, months = 12,
       fundStats, fundOrder, choleskyL,
       allocation, months, premium, premiumMonths,
       rebalanceMode: 'none', initialNav, feeParams: {},
-    })
+    }).values
   );
 }
 
@@ -524,7 +528,7 @@ console.log('\nSuite 7: Simulated mean ≈ input mean, simulated std ≈ input s
     // Collect log(value[1] / premium) over N_A scenarios
     let sumLR = 0, sumSq = 0;
     for (let i = 0; i < N_A; i++) {
-      const s = runScenario({
+      const { values: s } = runScenario({
         fundStats, fundOrder: ['F'], choleskyL,
         allocation: { F: 1 }, months: 2,
         premium: premium_A, premiumMonths: pmSet,
@@ -639,7 +643,7 @@ console.log('  fundStats.mean = −σ²/2  (Itô-corrected zero-arithmetic-drift
     const choleskyL = [[sigma]];
 
     const finals = Array.from({ length: N }, () => {
-      const s = runScenario({
+      const { values: s } = runScenario({
         fundStats, fundOrder: ['F'], choleskyL,
         allocation: { F: 1 }, months,
         premium, premiumMonths: pmMonths,
@@ -685,8 +689,206 @@ console.log('  fundStats.mean = −σ²/2  (Itô-corrected zero-arithmetic-drift
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Suite 9 — Phase 2b: admin fee deduction, lapse detection, survival curve
+// ═══════════════════════════════════════════════════════════════════════════════
+console.log('\nSuite 9: Phase 2b admin fee + lapse + survival');
+
+// Pull applyFees out of the VM context (fees.js is loaded into simCtx)
+const { applyFees } = simCtx;
+
+// 9.1 — applyFees deterministic admin fee + pro-rata
+{
+  const portfolio = { A: 100, B: 200, C: 300 };
+  const bidPrices = { A: 10, B: 5, C: 2 };
+  // AUM = 100*10 + 200*5 + 300*2 = 1000+1000+600 = 2600
+  // adminFee at 1% = 26
+  const before = { ...portfolio };
+  const aumBefore = 2600;
+  const ratioBefore = { A: 1000/2600, B: 1000/2600, C: 600/2600 };
+
+  const result = applyFees(portfolio, bidPrices, { adminFeeRate: 0.01 }, 0);
+
+  near('9.1 admin fee = AUM × rate', result.adminFee, 26, 1e-9);
+  check('9.1 not lapsed (fee << AUM)', result.lapsed === false, `lapsed=${result.lapsed}`);
+
+  // Pro-rata invariant — each fund's value-share must be unchanged
+  const aumAfter = portfolio.A * 10 + portfolio.B * 5 + portfolio.C * 2;
+  near('9.1 post-fee AUM = pre × (1 - rate)', aumAfter, 2600 * 0.99, 1e-9);
+  for (const f of ['A', 'B', 'C']) {
+    const newRatio = (portfolio[f] * bidPrices[f]) / aumAfter;
+    near(`9.1 pro-rata: ${f} value-share preserved`, newRatio, ratioBefore[f], 1e-12);
+    near(`9.1 pro-rata: ${f} units = before × (1 - rate)`, portfolio[f], before[f] * 0.99, 1e-9);
+  }
+}
+
+// 9.2 — applyFees with adminFeeRate = 0 → no mutation, no fee, no lapse
+{
+  const portfolio = { A: 100, B: 200 };
+  const bidPrices = { A: 10, B: 5 };
+  const result = applyFees(portfolio, bidPrices, { adminFeeRate: 0 }, 5);
+  near('9.2 zero rate → adminFee = 0', result.adminFee, 0, 1e-12);
+  check('9.2 zero rate → not lapsed', result.lapsed === false, '');
+  check('9.2 zero rate → portfolio unchanged', portfolio.A === 100 && portfolio.B === 200, '');
+}
+
+// 9.3 — applyFees with empty/zero AUM → lapsed
+{
+  const portfolio = { A: 0, B: 0 };
+  const bidPrices = { A: 10, B: 5 };
+  const result = applyFees(portfolio, bidPrices, { adminFeeRate: 0.01 }, 0);
+  check('9.3 zero AUM → lapsed = true', result.lapsed === true, '');
+}
+
+// 9.4 — applyFees with fee > AUM → lapsed and portfolio zeroed
+{
+  const portfolio = { A: 1, B: 1 };
+  const bidPrices = { A: 1, B: 1 };
+  // AUM = 2, rate = 200% → fee = 4 > AUM
+  const result = applyFees(portfolio, bidPrices, { adminFeeRate: 2 }, 0);
+  check('9.4 fee ≥ AUM → lapsed = true', result.lapsed === true, '');
+  check('9.4 fee ≥ AUM → portfolio zeroed', portfolio.A === 0 && portfolio.B === 0, '');
+}
+
+// 9.5 — runScenario: lapseRate = 0 when adminFeeRate = 0
+{
+  const fundStats = { F: { mean: 0, std: 0.04, offerRatio: 1, bidRatio: 1 } };
+  const choleskyL = [[0.04]];
+  let lapseCount = 0;
+  for (let i = 0; i < 200; i++) {
+    const { lapseMonth } = runScenario({
+      fundStats, fundOrder: ['F'], choleskyL,
+      allocation: { F: 1 }, months: 60,
+      premium: 5000, premiumMonths: buildPremiumMonths('monthly', 60),
+      rebalanceMode: 'none', initialNav: { F: 10 },
+      feeParams: { adminFeeRate: 0 },
+      rng: makePRNG(0xCAFE + i),
+    });
+    if (lapseMonth !== null) lapseCount++;
+  }
+  check('9.5 adminFeeRate=0 → no scenarios lapse', lapseCount === 0, `lapseCount=${lapseCount}`);
+}
+
+// 9.6 — runScenario: fee ≥ AUM triggers lapse at exact month
+//   With rate=2.0 and AUM=100 after month 0 premium, fee=200 ≥ AUM → lapses
+//   immediately at month 0. Tests the lapse mechanism end-to-end.
+//   (Realistic Phase 2b admin fee = 0.0583%/mo never lapses; Phase 2c COI
+//   adds a fixed-THB component that can drive AUM negative.)
+{
+  const fundStats = { F: { mean: 0, std: 0, offerRatio: 1, bidRatio: 1 } };
+  const { values, lapseMonth } = runScenario({
+    fundStats, fundOrder: ['F'], choleskyL: [[0]],
+    allocation: { F: 1 }, months: 12,
+    premium: 100, premiumMonths: new Set([0]),
+    rebalanceMode: 'none', initialNav: { F: 10 },
+    feeParams: { adminFeeRate: 2.0 },
+  });
+  check('9.6 fee ≥ AUM → lapses at month 0', lapseMonth === 0, `lapseMonth=${lapseMonth}`);
+  let allZero = true;
+  for (let m = 0; m < 12; m++) if (values[m] !== 0) allZero = false;
+  check('9.6 post-lapse values are all 0', allZero, '');
+}
+
+// 9.7 — runScenario: ongoing premium does NOT reverse lapse
+//   Even though premiumMonths fires every month, once lapsed the early
+//   `if (lapseMonth !== null) continue` skips premium handling forever.
+{
+  const fundStats = { F: { mean: 0, std: 0, offerRatio: 1, bidRatio: 1 } };
+  const { values, lapseMonth } = runScenario({
+    fundStats, fundOrder: ['F'], choleskyL: [[0]],
+    allocation: { F: 1 }, months: 24,
+    premium: 100, premiumMonths: buildPremiumMonths('monthly', 24),
+    rebalanceMode: 'none', initialNav: { F: 10 },
+    feeParams: { adminFeeRate: 2.0 },
+  });
+  check('9.7 lapses despite ongoing premium', lapseMonth !== null, '');
+  let allZeroAfter = true;
+  for (let m = lapseMonth; m < 24; m++) if (values[m] !== 0) allZeroAfter = false;
+  check('9.7 values stay 0 post-lapse despite scheduled premiums', allZeroAfter, '');
+}
+
+// 9.9 — totalAdminFee closed-form: lump-sum AUM × rate × months (std=0, no premium drift)
+//   With initial portfolio X units at NAV=10 (AUM=10X), no premium, rate=r:
+//     month 0: pre-fee AUM = 10X, fee = 10X·r,  post AUM = 10X(1-r)
+//     month 1: pre-fee AUM = 10X(1-r), fee = 10X(1-r)·r,  post = 10X(1-r)²
+//     ...
+//     totalAdminFee = 10X · r · (1 + (1-r) + (1-r)² + ... + (1-r)^(M-1))
+//                   = 10X · (1 - (1-r)^M)
+{
+  const fundStats = { F: { mean: 0, std: 0, offerRatio: 1, bidRatio: 1 } };
+  const rate = 0.01;     // 1%/mo
+  const months = 24;
+  const initialAum = 10000;   // premium 10000 at month 0 → 1000 units at NAV=10
+
+  const { totalAdminFee, lapseMonth } = runScenario({
+    fundStats, fundOrder: ['F'], choleskyL: [[0]],
+    allocation: { F: 1 }, months,
+    premium: initialAum, premiumMonths: new Set([0]),
+    rebalanceMode: 'none', initialNav: { F: 10 },
+    feeParams: { adminFeeRate: rate },
+  });
+  const expected = initialAum * (1 - Math.pow(1 - rate, months));
+  near('9.9 totalAdminFee = AUM·(1-(1-r)^M) (lump-sum, no growth)',
+    totalAdminFee, expected, 1e-6);
+  check('9.9 no lapse (rate << 1)', lapseMonth === null, '');
+}
+
+// 9.10 — totalAdminFee = 0 when adminFeeRate = 0
+{
+  const fundStats = { F: { mean: 0, std: 0.04, offerRatio: 1, bidRatio: 1 } };
+  const { totalAdminFee } = runScenario({
+    fundStats, fundOrder: ['F'], choleskyL: [[0.04]],
+    allocation: { F: 1 }, months: 12,
+    premium: 1000, premiumMonths: buildPremiumMonths('monthly', 12),
+    rebalanceMode: 'none', initialNav: { F: 10 },
+    feeParams: { adminFeeRate: 0 },
+    rng: makePRNG(0xFEE),
+  });
+  near('9.10 zero rate → totalAdminFee = 0', totalAdminFee, 0, 1e-12);
+}
+
+// 9.8 — runMonteCarlo: survival curve monotonic decreasing (async)
+//   Pulled into the async report tail below since runMonteCarlo is a Promise.
+async function suite9_8() {
+  // Synthetic NAV data so runMonteCarlo can compute fundStats
+  const navData = { F: [] };
+  let d = new Date(2020, 0, 1);
+  for (let i = 0; i < 60; i++) {
+    navData.F.push({ date: new Date(d), nav: 10, offer: 10, bid: 10 });
+    d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+
+  // Pull runMonteCarlo from VM context
+  const { runMonteCarlo } = simCtx;
+
+  const result = await runMonteCarlo({
+    navData, allocation: { F: 100 }, premium: 100,
+    paymentMode: 'monthly', months: 60,
+    rebalanceMode: 'none', N: 100,
+    feeParams: { adminFeeRate: 0.05 },
+    seed: 0x900D,
+    userAge: 30,
+  });
+
+  check('9.8 survivalMonthly length = months',
+    result.survivalMonthly.length === 60, `len=${result.survivalMonthly.length}`);
+  let monotonic = true;
+  for (let m = 1; m < 60; m++) {
+    if (result.survivalMonthly[m] > result.survivalMonthly[m - 1]) { monotonic = false; break; }
+  }
+  check('9.8 survivalMonthly is non-increasing', monotonic, '');
+  check('9.8 survivalYearly[0] = 1', result.survivalYearly[0] === 1, '');
+  check('9.8 survivalYearly length = years + 1',
+    result.survivalYearly.length === 6, `len=${result.survivalYearly.length}`);
+  check('9.8 avgLapseAge ≥ userAge when lapses occur',
+    result.avgLapseAge === null || result.avgLapseAge >= 30, `age=${result.avgLapseAge}`);
+  check('9.8 p50AdminFee > 0 when adminFeeRate > 0 and P50 in-force',
+    result.p50AdminFee > 0, `p50AdminFee=${result.p50AdminFee}`);
+}
+
 // ─── Report ───────────────────────────────────────────────────────────────────
 
+suite9_8().then(() => {
 console.log('');
 if (failed === 0) {
   console.log(`All ${passed} tests passed.`);
@@ -696,3 +898,4 @@ if (failed === 0) {
   failures.forEach(m => console.error(m));
   process.exit(1);
 }
+});

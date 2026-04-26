@@ -818,7 +818,9 @@ async function runSimulation() {
   const baseConfig = {
     navData: state.navData, allocation: state.allocation,
     premium: state.premium, paymentMode: state.paymentMode,
-    months: simMonths, N: state.N, feeParams: {},
+    months: simMonths, N: state.N,
+    feeParams: { adminFeeRate: (_product?.adminFee?.rate) || 0 },
+    userAge: state.product.age,
     premiumPaymentMonths: _pptMonths,
     product: state.product,
     regimeSwitching: true,
@@ -1208,7 +1210,70 @@ function buildResultsStep() {
 
   renderPercentileChart();
   renderRebalCompareInsight();
+  renderLapseStats();
   buildSummaryTable();
+}
+
+/**
+ * Render lapse statistics: avg lapse age + yearly survival curve.
+ * Hidden when no scenarios lapsed (avgLapseAge === null).
+ */
+let _survivalChartInstance = null;
+function renderLapseStats() {
+  const card = document.getElementById('lapseStats');
+  const body = document.getElementById('lapseStatsBody');
+  if (!card || !body) return;
+
+  const r = state.results;
+  if (!r || r.avgLapseAge == null) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+
+  // Final survival = last yearly point
+  const finalSurvival = r.survivalYearly[r.survivalYearly.length - 1];
+  const lapseRate = (1 - finalSurvival) * 100;
+
+  body.innerHTML = `
+    <p>อายุเฉลี่ยเมื่อขาดอายุ: <strong>${r.avgLapseAge.toFixed(1)}</strong> ปี</p>
+    <p style="color:var(--gray-600);font-size:.875rem">
+      สิ้นสุดปีที่ ${r.survivalYearly.length - 1}: ยังถืออยู่ ${(finalSurvival * 100).toFixed(1)}%
+      (ขาดอายุสะสม ${lapseRate.toFixed(1)}%)
+    </p>
+  `;
+
+  // Yearly survival line chart
+  const ctx = document.getElementById('survivalChart')?.getContext('2d');
+  if (!ctx || typeof Chart === 'undefined') return;
+  if (_survivalChartInstance) _survivalChartInstance.destroy();
+
+  const labels = r.survivalYearly.map((_, y) => `ปีที่ ${y}`);
+  const data   = r.survivalYearly.map(v => +(v * 100).toFixed(2));
+
+  _survivalChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '% ในระบบ',
+        data,
+        borderColor: '#dc2626',
+        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+        tension: 0.2,
+        fill: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { min: 0, max: 100, title: { display: true, text: '% ในระบบ' } },
+        x: { title: { display: true, text: 'ปี' } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  });
 }
 
 function renderPercentileChart() {
@@ -1376,8 +1441,36 @@ function renderOutcomeSummary() {
         <span class="planning-banner-icon">ⓘ</span>
         <span>กรอบการวางแผนที่สมเหตุสมผล: <strong>${fmtTHB(p25Final)}</strong> – <strong>${fmtTHB(p75Final)}</strong> ครอบคลุมสถานการณ์ส่วนใหญ่ที่อาจเกิดขึ้น</span>
       </div>
+      ${renderFeeSummary()}
     </div>
   `;
+}
+
+/**
+ * Render fee summary line — shows actual admin fee paid by the P50 scenario
+ * (correlated with the P50 portfolio displayed in the outcome card).
+ * Returns empty string when fee is 0 (INVESTMENT-ONLY or all lapsed).
+ */
+function renderFeeSummary() {
+  const r = state.results;
+  if (!r || !r.p50AdminFee || r.p50AdminFee <= 0) return '';
+
+  const totalPaid = state.premium * paymentCount();
+  const feePct = totalPaid > 0 ? (r.p50AdminFee / totalPaid * 100) : 0;
+
+  return `
+    <div class="planning-banner" style="background:#fef3c7;border-color:#f59e0b;margin-top:.5rem">
+      <span class="planning-banner-icon">💰</span>
+      <span>ค่าธรรมเนียมบริหาร (กรณี P50): <strong>${fmtTHB(r.p50AdminFee)}</strong>
+        (≈ ${feePct.toFixed(1)}% ของเบี้ยที่ชำระทั้งหมด)</span>
+    </div>
+  `;
+}
+
+function paymentCount() {
+  const _ppt = state.lastRun && state.lastRun.pptMonths;
+  const months = _ppt != null ? Math.min(state.results.months, _ppt) : state.results.months;
+  return Math.ceil(months / simPaymentStep());
 }
 
 function buildSummaryTable() {

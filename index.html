@@ -346,6 +346,18 @@
     <!-- Rebalance compare insight — visible only in compare mode -->
     <div id="rebalCompareInsight" style="display:none"></div>
 
+    <!-- Lapse stats — Phase 2b: avg lapse age + yearly survival curve -->
+    <div class="card" id="lapseStats" style="display:none">
+      <div class="card-title"><span class="icon">📉</span> ความน่าจะเป็นกรมธรรม์ขาดอายุ (Lapse)</div>
+      <div id="lapseStatsBody"></div>
+      <div id="survivalChartContainer" style="margin-top:1rem">
+        <canvas id="survivalChart"></canvas>
+      </div>
+      <p class="hint" style="margin-top:.5rem;color:var(--gray-500);font-size:.875rem">
+        % ของกรณีจำลองที่ยังถือกรมธรรม์ในแต่ละปี (in-force rate)
+      </p>
+    </div>
+
     <!-- Summary table -->
     <div class="card">
       <div class="card-title"><span class="icon">📋</span> ตารางสรุปผลลัพธ์</div>
@@ -383,6 +395,7 @@
 <!-- App modules -->
 <script src="js/products/index.js"></script>
 <script src="js/cov-builder.js"></script>
+<script src="js/fees.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/export.js"></script>

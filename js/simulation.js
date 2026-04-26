@@ -304,23 +304,9 @@ function calcIRR(premium, step, months, finalValue, pptMonths = null) {
   return (Math.pow(1 + (lo + hi) / 2, 12) - 1) * 100;
 }
 
-// ─── Fee hook (v1 = no-op; replace in future version) ────────────────────────
-
-/**
- * Apply monthly fee deductions to the portfolio.
- * @param {Object} portfolio  { fundName: units }
- * @param {Object} bidPrices  { fundName: currentBID }
- * @param {Object} feeParams  fee configuration (unused in v1)
- * @param {number} month      0-based month index
- * @returns {Object}          modified portfolio (same reference)
- *
- * TODO v2: subtract admin fee, COI, premium charge here.
- */
-// eslint-disable-next-line no-unused-vars
-function applyFees(portfolio, bidPrices, feeParams, month) {
-  // v1: no-op
-  return portfolio;
-}
+// ─── Fee hook ────────────────────────────────────────────────────────────────
+// applyFees() is defined in js/fees.js (loaded before this file in both
+// browser and the test VM context).  See fees.js for signature & semantics.
 
 // ─── Rebalance helper ─────────────────────────────────────────────────────────
 // Spread cost applies only to the DELTA (amount actually traded), not the
@@ -378,7 +364,14 @@ function rebalance(portfolio, navPrices, fundStats, allocation) {
  *   - regimes           [{ name, muScale, sigmaScale }] — regime definitions
  *   - transitionMatrix  number[][] — row-stochastic n×n Markov transition matrix
  *   - stationaryDist    number[]  — stationary distribution (pre-computed)
- * @returns {number[]}  portfolio value (at BID) at end of each month
+ * @returns {{ values: number[], lapseMonth: number|null, totalAdminFee: number }}
+ *   values        — portfolio value (at BID) at end of each month;
+ *                   values[m] = 0 for m ≥ lapseMonth (post-lapse marker — filter
+ *                   in percentile/mean aggregation, do NOT display directly).
+ *   lapseMonth    — month index at which policy lapsed (AUM ≤ 0 after fees);
+ *                   null if the policy never lapsed.
+ *   totalAdminFee — sum of admin fees deducted across all months (THB);
+ *                   includes the lapse-month fee that triggered lapse.
  */
 function runScenario(params) {
   const {
@@ -404,14 +397,69 @@ function runScenario(params) {
   }
 
   const values = new Array(months);
+  let lapseMonth = null;
+  let totalAdminFee = 0;
 
   // Initialise regime state from stationary distribution (regime switching only)
   let regimeIdx = regimeSwitching ? sampleFromCDF(stationaryDist, rng) : 0;
 
   for (let m = 0; m < months; m++) {
-    // 1. Simulate NAV movement — correlated shocks via Cholesky decomposition.
+    // Post-lapse: skip premium, fees, rebalance, market shock.
+    // values[m] = 0 is an internal marker — percentile/mean aggregation MUST
+    // filter in-force paths only, never display these zeros to the user.
+    if (lapseMonth !== null) {
+      values[m] = 0;
+      continue;
+    }
+
+    // ── Phase 2b loop order (D1) ────────────────────────────────────────────
+    //   1. Premium contribution (buy at Offer)
+    //   2. SNAPSHOT AUM at BID  (passed into applyFees)
+    //   3. applyFees() — admin fee + lapse check
+    //   4. Rebalance
+    //   5. Record value at BID
+    //   6. Market shock — NAV update for next month's open
+
+    // 1. Add premium contribution — buy units at Offer price
+    if (premiumMonths.has(m)) {
+      for (const f of funds) {
+        const offerPrice = nav[f] * (fundStats[f]?.offerRatio ?? 1);
+        portfolio[f] += (premium * (allocation[f] || 0)) / offerPrice;
+      }
+    }
+
+    // 2. SNAPSHOT AUM at BID — pre-compute bid prices for fees & valuation
+    const bidPrices = {};
+    for (const f of funds) bidPrices[f] = nav[f] * (fundStats[f]?.bidRatio ?? 1);
+
+    // 3. Apply fees (admin fee in Phase 2b; COI added in Phase 2c)
+    const { adminFee, lapsed } = applyFees(portfolio, bidPrices, feeParams, m);
+    totalAdminFee += adminFee;
+    if (lapsed) {
+      lapseMonth = m;
+      values[m] = 0;
+      continue;
+    }
+
+    // 4. Rebalance if scheduled
+    const shouldRebalance =
+      rebalanceMode === 'monthly' ||
+      (rebalanceMode === 'quarterly' && (m + 1) % 3 === 0) ||
+      (rebalanceMode === 'annual'    && (m + 1) % 12 === 0);
+    if (shouldRebalance) {
+      rebalance(portfolio, nav, fundStats, allocation);
+    }
+
+    // 5. Record total portfolio value at BID prices (reuse bidPrices snapshot
+    //    is intentionally NOT done — rebalance may have shifted units, so
+    //    re-multiply against the same bidPrices for consistency this month)
+    let total = 0;
+    for (const f of funds) total += portfolio[f] * bidPrices[f];
+    values[m] = total;
+
+    // 6. Market shock — correlated NAV movement via Cholesky decomposition.
     //
-    //    Draw z ~ N(0, I),  then compute  w = L · z  where L is the lower-
+    //    Draw z ~ N(0, I), then compute  w = L · z  where L is the lower-
     //    triangular Cholesky factor of the covariance matrix Σ.
     //    By construction:  Cov(w) = L · Lᵀ = Σ,  so w[i] ~ N(0, std_i²)
     //    with the historical inter-fund correlations embedded.
@@ -452,37 +500,9 @@ function runScenario(params) {
 
     // Transition to next regime using the Markov transition matrix
     if (regimeSwitching) regimeIdx = sampleFromCDF(transitionMatrix[regimeIdx], rng);
-
-    // 2. Add premium contribution — buy units at Offer price
-    if (premiumMonths.has(m)) {
-      for (const f of funds) {
-        const offerPrice = nav[f] * (fundStats[f]?.offerRatio ?? 1);
-        portfolio[f] += (premium * (allocation[f] || 0)) / offerPrice;
-      }
-    }
-
-    // 3. Apply fees (v1 no-op; hook for future extension)
-    applyFees(portfolio, nav, feeParams, m);
-
-    // 4. Rebalance if scheduled
-    const shouldRebalance =
-      rebalanceMode === 'monthly' ||
-      (rebalanceMode === 'quarterly' && (m + 1) % 3 === 0) ||
-      (rebalanceMode === 'annual'    && (m + 1) % 12 === 0);
-    if (shouldRebalance) {
-      rebalance(portfolio, nav, fundStats, allocation);
-    }
-
-    // 5. Record total portfolio value at BID prices
-    let total = 0;
-    for (const f of funds) {
-      const bidPrice = nav[f] * (fundStats[f]?.bidRatio ?? 1);
-      total += portfolio[f] * bidPrice;
-    }
-    values[m] = total;
   }
 
-  return values;
+  return { values, lapseMonth, totalAdminFee };
 }
 
 // ─── Premium month set builder ────────────────────────────────────────────────
@@ -514,9 +534,24 @@ function buildPremiumMonths(mode, totalMonths, pptMonths = null) {
  *   - months         total simulation months
  *   - rebalanceMode  'none' | 'monthly' | 'quarterly' | 'annual'
  *   - N              number of scenarios
- *   - feeParams      {} (reserved)
+ *   - feeParams      { adminFeeRate, ... }  passed through to applyFees()
+ *   - userAge        starting age — used to convert lapseMonth → lapseAge
  * @param {Function} onProgress  (pct: 0-100) => void
- * @returns {Promise<{ percentiles, months }>}
+ * @returns {Promise<{
+ *     percentiles, meanSeries, months,
+ *     survivalMonthly, survivalYearly,
+ *     avgLapseAge, userAge, covDiagnostics
+ *   }>}
+ *   percentiles[p][m]  = p-th percentile across IN-FORCE paths only at month m
+ *   meanSeries[m]      = mean across IN-FORCE paths only at month m
+ *   survivalMonthly[m] = fraction (0-1) still in force at end of month m
+ *   survivalYearly[y]  = fraction (0-1) still in force at end of year y (1-based);
+ *                        survivalYearly[0] is always 1 (start of policy)
+ *   avgLapseAge        = mean of (userAge + lapseMonth/12) across lapsed
+ *                        scenarios; null if no scenario lapsed
+ *   p50AdminFee        = totalAdminFee of the in-force scenario whose final
+ *                        value sits at the P50 rank — pairs correctly with
+ *                        the displayed P50 portfolio (NOT the population mean)
  */
 async function runMonteCarlo(config, onProgress) {
   const {
@@ -524,6 +559,7 @@ async function runMonteCarlo(config, onProgress) {
     months, rebalanceMode, N, feeParams = {},
     seed = Date.now(),
     premiumPaymentMonths = null,
+    userAge = null,
     regimeSwitching = false,
     regimes = [],
     transitionMatrix = []
@@ -548,21 +584,25 @@ async function runMonteCarlo(config, onProgress) {
   }
 
   const premiumMonths = buildPremiumMonths(paymentMode, months, premiumPaymentMonths);
-  const allSeries = [];
+  const allSeries  = [];
+  const lapseMonths = [];
+  const adminFees   = [];
 
   const BATCH = 100;
   for (let i = 0; i < N; i++) {
     // Each scenario gets its own deterministic PRNG seeded by (mainSeed + index).
     // Same seed → identical results; different index → independent streams.
     const rng = mulberry32(seed + i);
-    const series = runScenario({
+    const { values, lapseMonth, totalAdminFee } = runScenario({
       fundStats, fundOrder, choleskyL,
       allocation: allocFrac, months,
       premium, premiumMonths,
       rebalanceMode, initialNav, feeParams, rng,
       regimeSwitching, regimes, transitionMatrix, stationaryDist
     });
-    allSeries.push(series);
+    allSeries.push(values);
+    lapseMonths.push(lapseMonth);
+    adminFees.push(totalAdminFee);
 
     if (i % BATCH === BATCH - 1) {
       onProgress && onProgress(Math.round((i + 1) / N * 100));
@@ -571,26 +611,91 @@ async function runMonteCarlo(config, onProgress) {
   }
   onProgress && onProgress(100);
 
-  // Mean series — average portfolio value at each month across all N scenarios.
-  // Computed in one streaming pass so we never need to revisit allSeries.
-  const meanSeries = new Array(months).fill(0);
-  for (const s of allSeries) {
-    for (let m = 0; m < months; m++) meanSeries[m] += s[m];
-  }
-  for (let m = 0; m < months; m++) meanSeries[m] /= N;
+  // ── In-force aggregation (D3) ────────────────────────────────────────────
+  // At month m, a scenario is "in-force" iff lapseMonth === null OR
+  // lapseMonth > m.  Percentile and meanSeries use ONLY in-force paths so
+  // post-lapse zeros do not drag the curves down.
+  const isActiveAt = (s, m) => lapseMonths[s] === null || lapseMonths[s] > m;
 
-  // Percentile bands month-by-month
+  const meanSeries = new Array(months).fill(0);
   const pctBands = [25, 50, 75, 98];
   const percentiles = {};
   for (const p of pctBands) percentiles[p] = new Array(months);
+  const survivalMonthly = new Array(months);
 
   for (let m = 0; m < months; m++) {
-    const col = allSeries.map(s => s[m]).sort((a, b) => a - b);
+    const active = [];
+    for (let s = 0; s < N; s++) {
+      if (isActiveAt(s, m)) active.push(allSeries[s][m]);
+    }
+    survivalMonthly[m] = active.length / N;
+
+    if (active.length === 0) {
+      // All scenarios have lapsed by month m — leave NaN-equivalent zeros
+      for (const p of pctBands) percentiles[p][m] = 0;
+      meanSeries[m] = 0;
+      continue;
+    }
+
+    let sum = 0;
+    for (const v of active) sum += v;
+    meanSeries[m] = sum / active.length;
+
+    active.sort((a, b) => a - b);
     for (const p of pctBands) {
-      const idx = Math.floor((p / 100) * (col.length - 1));
-      percentiles[p][m] = col[idx];
+      const idx = Math.floor((p / 100) * (active.length - 1));
+      percentiles[p][m] = active[idx];
     }
   }
 
-  return { percentiles, months, meanSeries, covDiagnostics };
+  // Yearly survival aggregate (D5) — survivalYearly[0] = 1 (policy start),
+  // survivalYearly[y] = survival at end of year y (= survivalMonthly[12y - 1])
+  const years = Math.floor(months / 12);
+  const survivalYearly = new Array(years + 1);
+  survivalYearly[0] = 1;
+  for (let y = 1; y <= years; y++) {
+    survivalYearly[y] = survivalMonthly[12 * y - 1];
+  }
+
+  // Average lapse age across lapsed scenarios
+  let lapseAgeSum = 0, lapseCount = 0;
+  for (let s = 0; s < N; s++) {
+    if (lapseMonths[s] !== null) {
+      const age = (userAge ?? 0) + lapseMonths[s] / 12;
+      lapseAgeSum += age;
+      lapseCount++;
+    }
+  }
+  const avgLapseAge = lapseCount > 0 ? lapseAgeSum / lapseCount : null;
+
+  // Admin fee paid by the P50-portfolio scenario (in-force at end of horizon).
+  //
+  //   Why correlated, not mean:
+  //   The outcome card displays P50 portfolio = positional median across in-
+  //   force scenarios at the final month.  Showing arithmetic mean of fees
+  //   pairs a percentile-statistic with a population-statistic — different
+  //   scenarios → misleading.  Instead, identify the scenario that produced
+  //   the displayed P50 final value and report its actual totalAdminFee.
+  //
+  //   Scope: in-force only at the final month (matches percentiles[50] basis).
+  //   If all paths lapsed, fee = 0 (no in-force scenario to report).
+  const finalMonth = months - 1;
+  const activeAtEnd = [];
+  for (let s = 0; s < N; s++) {
+    if (lapseMonths[s] === null || lapseMonths[s] > finalMonth) {
+      activeAtEnd.push({ idx: s, final: allSeries[s][finalMonth] });
+    }
+  }
+  let p50AdminFee = 0;
+  if (activeAtEnd.length > 0) {
+    activeAtEnd.sort((a, b) => a.final - b.final);
+    const p50Pick = activeAtEnd[Math.floor(activeAtEnd.length / 2)];
+    p50AdminFee = adminFees[p50Pick.idx];
+  }
+
+  return {
+    percentiles, months, meanSeries, covDiagnostics,
+    survivalMonthly, survivalYearly, avgLapseAge, userAge,
+    p50AdminFee,
+  };
 }
