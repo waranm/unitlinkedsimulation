@@ -72,6 +72,80 @@ function resampleMonthly(rows) {
   return Array.from(byMonth.values());
 }
 
+// ─── Long-run μ calibration (Bayesian shrinkage) ─────────────────────────────
+//
+// Problem: a short historical window (e.g. 3-year gold bull run → 22.9%/y)
+// fed directly into GBM over 69 years produces astronomical P50 values.
+// GBM has no mean-reversion; it blindly extrapolates the sample mean forever.
+//
+// Solution: shrink historical μ̂ toward a long-run prior using Bayesian
+// James–Stein-style shrinkage.  σ and correlations are NOT touched —
+// they carry genuine signal about volatility and co-movement.
+
+/**
+ * Long-run annualized expected returns (real-world prior μ∞).
+ * Override at runtime via window.LONG_RUN_MU_OVERRIDE = { equity: 0.08, ... }
+ */
+const LONG_RUN_MU_DEFAULTS = {
+  equity:       0.07,  // 7%/year  — long-run global equity
+  bond:         0.03,  // 3%/year  — investment grade
+  gold:         0.04,  // 4%/year  — long-run gold (nominal)
+  mixed:        0.05,  // 5%/year  — balanced / multi-asset
+  reit:         0.06,  // 6%/year  — real estate
+  commodity:    0.03,  // 3%/year
+  money_market: 0.02,  // 2%/year
+};
+
+/**
+ * Return long-run monthly log-return prior for an asset class.
+ * Applies window.LONG_RUN_MU_OVERRIDE if set (useful for what-if analysis).
+ * @param {string} assetClass
+ * @returns {number}  monthly log-return prior
+ */
+function getLongRunMu(assetClass) {
+  const overrides = (typeof window !== 'undefined' && window.LONG_RUN_MU_OVERRIDE) || {};
+  const merged = { ...LONG_RUN_MU_DEFAULTS, ...overrides };
+  const annualRate = merged[assetClass] ?? merged.mixed;
+  return Math.log(1 + annualRate) / 12;
+}
+
+/**
+ * Look up asset class for a fund — delegates to FundLib if available,
+ * falls back to 'mixed' in test environments where fundLibrary.js isn't loaded.
+ * @param {string} fund
+ * @returns {string}
+ */
+function getAssetClassForFund(fund) {
+  if (typeof window !== 'undefined' && window.FundLib?.getAssetClassForFund) {
+    return window.FundLib.getAssetClassForFund(fund);
+  }
+  return 'mixed'; // safe fallback for Node.js test environment
+}
+
+/**
+ * Bayesian shrinkage of the monthly log-return mean toward a long-run prior.
+ *
+ * Shrinkage weight α = n / (n + PRIOR_STRENGTH):
+ *   n=36  (3y data)  → α≈0.55  — prior dominates; historical data unreliable
+ *   n=120 (10y data) → α≈0.80  — mostly historical
+ *   n=240 (20y data) → α≈0.89  — data confident; prior barely matters
+ *
+ * @param {number} historicalMonthlyMu   raw mean of monthly log-returns
+ * @param {number} nObs                  number of monthly return observations
+ * @param {string} assetClass            one of LONG_RUN_MU_DEFAULTS keys
+ * @returns {{ mu: number, alpha: number, priorMonthly: number }}
+ *   mu           — shrunk monthly mean (use in GBM)
+ *   alpha        — data weight (0=pure prior, 1=pure historical)
+ *   priorMonthly — prior monthly log-return (for diagnostics)
+ */
+function shrinkMean(historicalMonthlyMu, nObs, assetClass) {
+  const PRIOR_STRENGTH = 120; // months of "virtual prior observations"
+  const priorMonthly = getLongRunMu(assetClass);
+  const alpha = nObs / (nObs + PRIOR_STRENGTH);
+  const mu = (1 - alpha) * priorMonthly + alpha * historicalMonthlyMu;
+  return { mu, alpha, priorMonthly };
+}
+
 /**
  * Calculate per-fund stats from historical data.
  * Input rows may be daily or monthly; stats are always returned as monthly.
@@ -113,13 +187,26 @@ function calcFundStats(navData) {
     }
 
     const n = returns.length;
-    const mean = n > 0 ? returns.reduce((a, b) => a + b, 0) / n : 0;
+    const rawMean = n > 0 ? returns.reduce((a, b) => a + b, 0) / n : 0;
     const variance = n > 1
-      ? returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)
+      ? returns.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1)
       : 0;
 
+    // ── Bayesian shrinkage on μ (long-run anchoring) ─────────────────────
+    // Short historical windows (e.g. 3y gold bull run → 22.9%/y) would be
+    // extrapolated directly by GBM over multi-decade horizons.  Shrink
+    // toward a real-world long-run prior instead.  σ is left unchanged.
+    const assetClass = getAssetClassForFund(fund);
+    const { mu: mean, alpha: shrinkAlpha, priorMonthly: priorMonthlyMu } =
+      shrinkMean(rawMean, n, assetClass);
+
     stats[fund] = {
-      mean,
+      mean,           // shrunk μ — used by GBM
+      rawMean,        // historical sample mean — kept for diagnostics
+      shrinkAlpha,    // data weight α ∈ (0,1)
+      priorMonthlyMu, // prior monthly log-return
+      assetClass,
+      nObs: n,
       std:        Math.sqrt(variance) || 0.01,
       offerRatio: ratioCount > 0 ? sumOfferRatio / ratioCount : 1,
       bidRatio:   ratioCount > 0 ? sumBidRatio   / ratioCount : 1,
@@ -286,7 +373,7 @@ function calcIRR(premium, step, months, finalValue, pptMonths = null) {
   function fv(r) {
     let sum = 0;
     for (let m = 0; m < premiumLimit; m += step) {
-      sum += premium * Math.pow(1 + r, months - m);
+      sum += premium * Math.pow(1 + r, months - m - 1);
     }
     return sum;
   }
@@ -304,23 +391,9 @@ function calcIRR(premium, step, months, finalValue, pptMonths = null) {
   return (Math.pow(1 + (lo + hi) / 2, 12) - 1) * 100;
 }
 
-// ─── Fee hook (v1 = no-op; replace in future version) ────────────────────────
-
-/**
- * Apply monthly fee deductions to the portfolio.
- * @param {Object} portfolio  { fundName: units }
- * @param {Object} bidPrices  { fundName: currentBID }
- * @param {Object} feeParams  fee configuration (unused in v1)
- * @param {number} month      0-based month index
- * @returns {Object}          modified portfolio (same reference)
- *
- * TODO v2: subtract admin fee, COI, premium charge here.
- */
-// eslint-disable-next-line no-unused-vars
-function applyFees(portfolio, bidPrices, feeParams, month) {
-  // v1: no-op
-  return portfolio;
-}
+// ─── Fee hook ────────────────────────────────────────────────────────────────
+// applyFees() is defined in js/fees.js (loaded before this file in both
+// browser and the test VM context).  See fees.js for signature & semantics.
 
 // ─── Rebalance helper ─────────────────────────────────────────────────────────
 // Spread cost applies only to the DELTA (amount actually traded), not the
@@ -378,7 +451,14 @@ function rebalance(portfolio, navPrices, fundStats, allocation) {
  *   - regimes           [{ name, muScale, sigmaScale }] — regime definitions
  *   - transitionMatrix  number[][] — row-stochastic n×n Markov transition matrix
  *   - stationaryDist    number[]  — stationary distribution (pre-computed)
- * @returns {number[]}  portfolio value (at BID) at end of each month
+ * @returns {{ values: number[], lapseMonth: number|null, totalAdminFee: number }}
+ *   values        — portfolio value (at BID) at end of each month;
+ *                   values[m] = 0 for m ≥ lapseMonth (post-lapse marker — filter
+ *                   in percentile/mean aggregation, do NOT display directly).
+ *   lapseMonth    — month index at which policy lapsed (AUM ≤ 0 after fees);
+ *                   null if the policy never lapsed.
+ *   totalAdminFee — sum of admin fees deducted across all months (THB);
+ *                   includes the lapse-month fee that triggered lapse.
  */
 function runScenario(params) {
   const {
@@ -404,14 +484,69 @@ function runScenario(params) {
   }
 
   const values = new Array(months);
+  let lapseMonth = null;
+  let totalAdminFee = 0;
 
   // Initialise regime state from stationary distribution (regime switching only)
   let regimeIdx = regimeSwitching ? sampleFromCDF(stationaryDist, rng) : 0;
 
   for (let m = 0; m < months; m++) {
-    // 1. Simulate NAV movement — correlated shocks via Cholesky decomposition.
+    // Post-lapse: skip premium, fees, rebalance, market shock.
+    // values[m] = 0 is an internal marker — percentile/mean aggregation MUST
+    // filter in-force paths only, never display these zeros to the user.
+    if (lapseMonth !== null) {
+      values[m] = 0;
+      continue;
+    }
+
+    // ── Phase 2b loop order (D1) ────────────────────────────────────────────
+    //   1. Premium contribution (buy at Offer)
+    //   2. SNAPSHOT AUM at BID  (passed into applyFees)
+    //   3. applyFees() — admin fee + lapse check
+    //   4. Rebalance
+    //   5. Record value at BID
+    //   6. Market shock — NAV update for next month's open
+
+    // 1. Add premium contribution — buy units at Offer price
+    if (premiumMonths.has(m)) {
+      for (const f of funds) {
+        const offerPrice = nav[f] * (fundStats[f]?.offerRatio ?? 1);
+        portfolio[f] += (premium * (allocation[f] || 0)) / offerPrice;
+      }
+    }
+
+    // 2. SNAPSHOT AUM at BID — pre-compute bid prices for fees & valuation
+    const bidPrices = {};
+    for (const f of funds) bidPrices[f] = nav[f] * (fundStats[f]?.bidRatio ?? 1);
+
+    // 3. Apply fees (admin fee in Phase 2b; COI added in Phase 2c)
+    const { adminFee, lapsed } = applyFees(portfolio, bidPrices, feeParams, m);
+    totalAdminFee += adminFee;
+    if (lapsed) {
+      lapseMonth = m;
+      values[m] = 0;
+      continue;
+    }
+
+    // 4. Rebalance if scheduled
+    const shouldRebalance =
+      rebalanceMode === 'monthly' ||
+      (rebalanceMode === 'quarterly' && (m + 1) % 3 === 0) ||
+      (rebalanceMode === 'annual'    && (m + 1) % 12 === 0);
+    if (shouldRebalance) {
+      rebalance(portfolio, nav, fundStats, allocation);
+    }
+
+    // 5. Record total portfolio value at BID prices (reuse bidPrices snapshot
+    //    is intentionally NOT done — rebalance may have shifted units, so
+    //    re-multiply against the same bidPrices for consistency this month)
+    let total = 0;
+    for (const f of funds) total += portfolio[f] * bidPrices[f];
+    values[m] = total;
+
+    // 6. Market shock — correlated NAV movement via Cholesky decomposition.
     //
-    //    Draw z ~ N(0, I),  then compute  w = L · z  where L is the lower-
+    //    Draw z ~ N(0, I), then compute  w = L · z  where L is the lower-
     //    triangular Cholesky factor of the covariance matrix Σ.
     //    By construction:  Cov(w) = L · Lᵀ = Σ,  so w[i] ~ N(0, std_i²)
     //    with the historical inter-fund correlations embedded.
@@ -452,37 +587,9 @@ function runScenario(params) {
 
     // Transition to next regime using the Markov transition matrix
     if (regimeSwitching) regimeIdx = sampleFromCDF(transitionMatrix[regimeIdx], rng);
-
-    // 2. Add premium contribution — buy units at Offer price
-    if (premiumMonths.has(m)) {
-      for (const f of funds) {
-        const offerPrice = nav[f] * (fundStats[f]?.offerRatio ?? 1);
-        portfolio[f] += (premium * (allocation[f] || 0)) / offerPrice;
-      }
-    }
-
-    // 3. Apply fees (v1 no-op; hook for future extension)
-    applyFees(portfolio, nav, feeParams, m);
-
-    // 4. Rebalance if scheduled
-    const shouldRebalance =
-      rebalanceMode === 'monthly' ||
-      (rebalanceMode === 'quarterly' && (m + 1) % 3 === 0) ||
-      (rebalanceMode === 'annual'    && (m + 1) % 12 === 0);
-    if (shouldRebalance) {
-      rebalance(portfolio, nav, fundStats, allocation);
-    }
-
-    // 5. Record total portfolio value at BID prices
-    let total = 0;
-    for (const f of funds) {
-      const bidPrice = nav[f] * (fundStats[f]?.bidRatio ?? 1);
-      total += portfolio[f] * bidPrice;
-    }
-    values[m] = total;
   }
 
-  return values;
+  return { values, lapseMonth, totalAdminFee };
 }
 
 // ─── Premium month set builder ────────────────────────────────────────────────
@@ -501,6 +608,73 @@ function buildPremiumMonths(mode, totalMonths, pptMonths = null) {
   return set;
 }
 
+// ─── Regime μ normalization ───────────────────────────────────────────────────
+
+/**
+ * Normalize regime muScales so E[muScale] = 1 under the stationary distribution,
+ * per fund.  This ensures regime switching changes the PATH and DISPERSION of
+ * returns but does NOT shift the long-run mean — μ stays anchored at the
+ * shrunk fundStats value.
+ *
+ * Funds using muOverride (absolute drift, e.g. gold in crisis) are skipped —
+ * their drift is intentional and should not be normalised.
+ *
+ * @param {Array}    regimes           regime config objects
+ * @param {number[][]} transitionMatrix row-stochastic Markov matrix
+ * @param {string[]} fundOrder
+ * @returns {Array}  new regimes array with normalised fundScales (caller's array untouched)
+ */
+function normalizeRegimeMuScales(regimes, transitionMatrix, fundOrder) {
+  if (!regimes.length || !transitionMatrix.length) return regimes;
+  const stationary = computeStationaryDist(transitionMatrix);
+
+  // Deep-clone so we never mutate the caller's config
+  const normalized = regimes.map(r => ({
+    ...r,
+    fundScales:   r.fundScales   ? { ...r.fundScales }   : undefined,
+    defaultScale: r.defaultScale ? { ...r.defaultScale } : undefined,
+  }));
+
+  for (const fund of fundOrder) {
+    let weightedSum = 0;
+    let hasOverride = false;
+    const scales = [];
+
+    for (let i = 0; i < normalized.length; i++) {
+      const r = normalized[i];
+      const s = r.fundScales?.[fund] ?? r.defaultScale ?? r;
+      if ('muOverride' in s) { hasOverride = true; break; }
+      const sc = s.muScale ?? 1;
+      scales.push(sc);
+      weightedSum += stationary[i] * sc;
+    }
+
+    // Skip funds with absolute muOverride — those are intentional
+    if (hasOverride || weightedSum <= 1e-9) continue;
+
+    // Rescale each regime's effective muScale for this fund
+    for (let i = 0; i < normalized.length; i++) {
+      const r = normalized[i];
+      const perFund = r.fundScales?.[fund];
+
+      if (perFund && 'muScale' in perFund) {
+        // Explicit per-fund scale exists — normalise in place
+        perFund.muScale = perFund.muScale / weightedSum;
+      } else if (!perFund && r.defaultScale && !('muOverride' in r.defaultScale)) {
+        // No per-fund override; create one derived from defaultScale
+        if (!r.fundScales) r.fundScales = {};
+        r.fundScales[fund] = {
+          muScale:    (r.defaultScale.muScale ?? 1) / weightedSum,
+          sigmaScale: r.defaultScale.sigmaScale ?? 1,
+        };
+      }
+      // If neither fundScales nor defaultScale applies, muScale is implicitly 1 for
+      // every regime → weightedSum = 1 → nothing to normalise; loop is a no-op.
+    }
+  }
+  return normalized;
+}
+
 // ─── Main simulation runner ───────────────────────────────────────────────────
 
 /**
@@ -514,9 +688,24 @@ function buildPremiumMonths(mode, totalMonths, pptMonths = null) {
  *   - months         total simulation months
  *   - rebalanceMode  'none' | 'monthly' | 'quarterly' | 'annual'
  *   - N              number of scenarios
- *   - feeParams      {} (reserved)
+ *   - feeParams      { adminFeeRate, ... }  passed through to applyFees()
+ *   - userAge        starting age — used to convert lapseMonth → lapseAge
  * @param {Function} onProgress  (pct: 0-100) => void
- * @returns {Promise<{ percentiles, months }>}
+ * @returns {Promise<{
+ *     percentiles, meanSeries, months,
+ *     survivalMonthly, survivalYearly,
+ *     avgLapseAge, userAge, covDiagnostics
+ *   }>}
+ *   percentiles[p][m]  = p-th percentile across IN-FORCE paths only at month m
+ *   meanSeries[m]      = mean across IN-FORCE paths only at month m
+ *   survivalMonthly[m] = fraction (0-1) still in force at end of month m
+ *   survivalYearly[y]  = fraction (0-1) still in force at end of year y (1-based);
+ *                        survivalYearly[0] is always 1 (start of policy)
+ *   avgLapseAge        = mean of (userAge + lapseMonth/12) across lapsed
+ *                        scenarios; null if no scenario lapsed
+ *   p50AdminFee        = totalAdminFee of the in-force scenario whose final
+ *                        value sits at the P50 rank — pairs correctly with
+ *                        the displayed P50 portfolio (NOT the population mean)
  */
 async function runMonteCarlo(config, onProgress) {
   const {
@@ -524,6 +713,7 @@ async function runMonteCarlo(config, onProgress) {
     months, rebalanceMode, N, feeParams = {},
     seed = Date.now(),
     premiumPaymentMonths = null,
+    userAge = null,
     regimeSwitching = false,
     regimes = [],
     transitionMatrix = []
@@ -534,6 +724,14 @@ async function runMonteCarlo(config, onProgress) {
 
   const { fundStats, fundOrder, choleskyL, covDiagnostics } = calcSimParams(navData);
   const funds = fundOrder;
+
+  // ── Regime μ normalization (default ON) ─────────────────────────────────
+  // Forces E[muScale] = 1 under stationary dist per fund so regime switching
+  // changes path dispersion but does NOT shift the long-run shrunk mean.
+  const normalizeRegimes = config.normalizeRegimes !== false;
+  const effectiveRegimes = (regimeSwitching && normalizeRegimes)
+    ? normalizeRegimeMuScales(regimes, transitionMatrix, fundOrder)
+    : regimes;
 
   // Normalise allocation to fractions
   const allocFrac = {};
@@ -548,21 +746,25 @@ async function runMonteCarlo(config, onProgress) {
   }
 
   const premiumMonths = buildPremiumMonths(paymentMode, months, premiumPaymentMonths);
-  const allSeries = [];
+  const allSeries  = [];
+  const lapseMonths = [];
+  const adminFees   = [];
 
   const BATCH = 100;
   for (let i = 0; i < N; i++) {
     // Each scenario gets its own deterministic PRNG seeded by (mainSeed + index).
     // Same seed → identical results; different index → independent streams.
     const rng = mulberry32(seed + i);
-    const series = runScenario({
+    const { values, lapseMonth, totalAdminFee } = runScenario({
       fundStats, fundOrder, choleskyL,
       allocation: allocFrac, months,
       premium, premiumMonths,
       rebalanceMode, initialNav, feeParams, rng,
-      regimeSwitching, regimes, transitionMatrix, stationaryDist
+      regimeSwitching, regimes: effectiveRegimes, transitionMatrix, stationaryDist
     });
-    allSeries.push(series);
+    allSeries.push(values);
+    lapseMonths.push(lapseMonth);
+    adminFees.push(totalAdminFee);
 
     if (i % BATCH === BATCH - 1) {
       onProgress && onProgress(Math.round((i + 1) / N * 100));
@@ -571,26 +773,107 @@ async function runMonteCarlo(config, onProgress) {
   }
   onProgress && onProgress(100);
 
-  // Mean series — average portfolio value at each month across all N scenarios.
-  // Computed in one streaming pass so we never need to revisit allSeries.
-  const meanSeries = new Array(months).fill(0);
-  for (const s of allSeries) {
-    for (let m = 0; m < months; m++) meanSeries[m] += s[m];
-  }
-  for (let m = 0; m < months; m++) meanSeries[m] /= N;
+  // ── In-force aggregation (D3) ────────────────────────────────────────────
+  // At month m, a scenario is "in-force" iff lapseMonth === null OR
+  // lapseMonth > m.  Percentile and meanSeries use ONLY in-force paths so
+  // post-lapse zeros do not drag the curves down.
+  const isActiveAt = (s, m) => lapseMonths[s] === null || lapseMonths[s] > m;
 
-  // Percentile bands month-by-month
+  const meanSeries = new Array(months).fill(0);
   const pctBands = [25, 50, 75, 98];
   const percentiles = {};
   for (const p of pctBands) percentiles[p] = new Array(months);
+  const survivalMonthly = new Array(months);
 
   for (let m = 0; m < months; m++) {
-    const col = allSeries.map(s => s[m]).sort((a, b) => a - b);
+    const active = [];
+    for (let s = 0; s < N; s++) {
+      if (isActiveAt(s, m)) active.push(allSeries[s][m]);
+    }
+    survivalMonthly[m] = active.length / N;
+
+    if (active.length === 0) {
+      // All scenarios have lapsed by month m — leave NaN-equivalent zeros
+      for (const p of pctBands) percentiles[p][m] = 0;
+      meanSeries[m] = 0;
+      continue;
+    }
+
+    let sum = 0;
+    for (const v of active) sum += v;
+    meanSeries[m] = sum / active.length;
+
+    active.sort((a, b) => a - b);
     for (const p of pctBands) {
-      const idx = Math.floor((p / 100) * (col.length - 1));
-      percentiles[p][m] = col[idx];
+      const idx = Math.floor((p / 100) * (active.length - 1));
+      percentiles[p][m] = active[idx];
     }
   }
 
-  return { percentiles, months, meanSeries, covDiagnostics };
+  // Yearly survival aggregate (D5) — survivalYearly[0] = 1 (policy start),
+  // survivalYearly[y] = survival at end of year y (= survivalMonthly[12y - 1])
+  const years = Math.floor(months / 12);
+  const survivalYearly = new Array(years + 1);
+  survivalYearly[0] = 1;
+  for (let y = 1; y <= years; y++) {
+    survivalYearly[y] = survivalMonthly[12 * y - 1];
+  }
+
+  // Average lapse age across lapsed scenarios
+  let lapseAgeSum = 0, lapseCount = 0;
+  for (let s = 0; s < N; s++) {
+    if (lapseMonths[s] !== null) {
+      const age = (userAge ?? 0) + lapseMonths[s] / 12;
+      lapseAgeSum += age;
+      lapseCount++;
+    }
+  }
+  const avgLapseAge = lapseCount > 0 ? lapseAgeSum / lapseCount : null;
+
+  // Admin fee paid by the P50-portfolio scenario (in-force at end of horizon).
+  //
+  //   Why correlated, not mean:
+  //   The outcome card displays P50 portfolio = positional median across in-
+  //   force scenarios at the final month.  Showing arithmetic mean of fees
+  //   pairs a percentile-statistic with a population-statistic — different
+  //   scenarios → misleading.  Instead, identify the scenario that produced
+  //   the displayed P50 final value and report its actual totalAdminFee.
+  //
+  //   Scope: in-force only at the final month (matches percentiles[50] basis).
+  //   If all paths lapsed, fee = 0 (no in-force scenario to report).
+  const finalMonth = months - 1;
+  const activeAtEnd = [];
+  for (let s = 0; s < N; s++) {
+    if (lapseMonths[s] === null || lapseMonths[s] > finalMonth) {
+      activeAtEnd.push({ idx: s, final: allSeries[s][finalMonth] });
+    }
+  }
+  let p50AdminFee = 0;
+  if (activeAtEnd.length > 0) {
+    activeAtEnd.sort((a, b) => a.final - b.final);
+    const p50Pick = activeAtEnd[Math.floor(activeAtEnd.length / 2)];
+    p50AdminFee = adminFees[p50Pick.idx];
+  }
+
+  // ── Calibration diagnostics (per-fund shrinkage summary) ────────────────
+  const calibrationDiagnostics = fundOrder.map(f => {
+    const s = fundStats[f];
+    return {
+      fund:              f,
+      assetClass:        s.assetClass  ?? 'mixed',
+      nObs:              s.nObs        ?? null,
+      historicalAnnual:  (Math.exp((s.rawMean   ?? s.mean) * 12) - 1) * 100,
+      priorAnnual:       (Math.exp(s.priorMonthlyMu * 12) - 1) * 100,
+      shrunkAnnual:      (Math.exp(s.mean * 12) - 1) * 100,
+      shrinkAlpha:       s.shrinkAlpha ?? 1,
+    };
+  });
+
+  return {
+    percentiles, months, meanSeries, covDiagnostics,
+    survivalMonthly, survivalYearly, avgLapseAge, userAge,
+    p50AdminFee,
+    calibrationDiagnostics,
+    regimesNormalized: regimeSwitching && normalizeRegimes,
+  };
 }

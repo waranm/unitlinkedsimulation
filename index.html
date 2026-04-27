@@ -118,11 +118,6 @@
 
     </div>
 
-    <div class="action-row">
-      <button class="btn btn-primary" id="btnNext1" disabled>
-        ถัดไป: ตั้งค่า →
-      </button>
-    </div>
 
     <div style="margin-top:24px"></div>
 
@@ -306,6 +301,18 @@
     <!-- Covariance quality warning — shown when history is short or pairs are thin -->
     <div id="covWarningBanner" style="display:none"></div>
 
+    <!-- Calibration diagnostics — Bayesian shrinkage summary per fund -->
+    <div id="calibrationCard" class="card" style="display:none">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="calibrationCardToggle">
+        <span class="icon">🎯</span> μ Calibration — ผลตอบแทนที่ใช้ในโมเดล
+        <span id="calibrationChevron" style="float:right;font-size:0.85em">▼ ดูรายละเอียด</span>
+      </div>
+      <div id="calibrationCardBody" style="display:none">
+        <div id="calibrationTable"></div>
+        <p id="calibrationNote" style="margin-top:0.75rem;font-size:0.85em;color:var(--gray-500)"></p>
+      </div>
+    </div>
+
     <!-- Outcome Summary Panel — injected by renderOutcomeSummary() -->
     <div id="resultSummaryPanel"></div>
 
@@ -346,6 +353,18 @@
     <!-- Rebalance compare insight — visible only in compare mode -->
     <div id="rebalCompareInsight" style="display:none"></div>
 
+    <!-- Lapse stats — Phase 2b: avg lapse age + yearly survival curve -->
+    <div class="card" id="lapseStats" style="display:none">
+      <div class="card-title"><span class="icon">📉</span> ความน่าจะเป็นกรมธรรม์ขาดอายุ (Lapse)</div>
+      <div id="lapseStatsBody"></div>
+      <div id="survivalChartContainer" style="margin-top:1rem">
+        <canvas id="survivalChart"></canvas>
+      </div>
+      <p class="hint" style="margin-top:.5rem;color:var(--gray-500);font-size:.875rem">
+        % ของกรณีจำลองที่ยังถือกรมธรรม์ในแต่ละปี (in-force rate)
+      </p>
+    </div>
+
     <!-- Summary table -->
     <div class="card">
       <div class="card-title"><span class="icon">📋</span> ตารางสรุปผลลัพธ์</div>
@@ -383,6 +402,7 @@
 <!-- App modules -->
 <script src="js/products/index.js"></script>
 <script src="js/cov-builder.js"></script>
+<script src="js/fees.js"></script>
 <script src="js/simulation.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/export.js"></script>

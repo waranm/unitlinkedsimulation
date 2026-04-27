@@ -93,7 +93,7 @@ js/
 - state.lastRun: { seed, productConfig snapshot, inputs, results }
 - state.whatIfResults: null (populated on rerun)
 
-## Roadmap (5 sub-phases — reduced from 6)
+## Roadmap (6 sub-phases)
 
 ### Phase 2a: Product config foundation ⭐ START HERE
 - Create products directory + 3 products (investment-only, ul-99-99, ul-10-99)
@@ -113,23 +113,72 @@ js/
 - **FIRST TOUCH of simulation.js since Phase 1**
 - CLAUDE.md Invariants update required
 
-### Phase 2b: Admin fee + lapse detection
-- Implement `applyFees()` in `js/fees.js` — admin fee first (% of AUM)
-- Wire into simulation.js (replace no-op)
-- Lapse detection (AV ≤ 0 → stop scenario)
-- Track lapseRate, avgLapseAge
-- Update CLAUDE.md Invariants
+### Phase 2b: Admin fee + lapse detection ✅ DONE (2026-04-25)
+- ✅ `applyFees()` implemented in `js/fees.js` — admin fee, pro-rata across funds
+- ✅ Loop reorder per spec timing (premium → snapshot → fees → market shock)
+- ✅ Lapse detection (AUM ≤ 0 after fees → set lapseMonth, skip rest)
+- ✅ Track `lapseMonth`, `survivalMonthly`, `survivalYearly`, `avgLapseAge`
+- ✅ In-force percentile filter (D3) — exclude lapsed paths from percentile/mean per month
+- ✅ `totalAdminFee` per scenario + `avgAdminFee` aggregate (verified fee deduction)
+- ✅ UI: lapse stats card + survival curve chart + fee summary banner
+- ✅ Tests: 107/107 passing (78 baseline + 29 Phase 2b in Suite 9)
+- ✅ CLAUDE.md Invariants + Pitfalls updated
+- See `prompts/prompt-phase2b-v1.md` for D1-D6 decisions; finished commit on `worktree-phase2b`
 
-### Phase 2c: Premium charge + COI
-- Premium charge (year-based, payment-count policy year)
-- COI with basis switch (nar | sa)
-- TMO2560 age-gender lookup + monthly conversion
-- Edge cases: age out of range, AV > SA for NAR basis
+### Phase 2c: Premium charge + COI + Loyalty bonus + monthly fee tracking
+**Fee implementations:**
+- Premium charge (year-based rate, payment-count policy year) — function `applyPremiumCharge(premium, feeParams, paymentCount) → netPremium`; called BEFORE buy-at-offer in scenario loop
+- COI inside `applyFees`: NAR basis (`max(0, SA - AUM)/1000 × monthly_coi_rate × loading`) or SA basis switch via product config
+- TMO2560 age-gender lookup + monthly conversion; edge cases: age out of range, AUM > SA for NAR basis (COI = 0)
+- Loyalty bonus types: `first-year-premium-based` | `aum-based` | `none`; does NOT apply to lapsed scenarios; for 99/99 UL with `loyaltyBonus: none` maturity = final AUM
 
-### Phase 2d: Loyalty bonus
-- Types: first-year-premium-based | aum-based | none
-- Bonus does not apply to lapsed scenarios
-- For 99/99 UL with `loyaltyBonus: none`: maturity = final AUM
+**Data layer (REQUIRED — Phase 2d depends on this):**
+- runScenario tracks **per-month arrays** (not just totals):
+  - `monthlyAdminFee[m]`, `monthlyCOI[m]`, `monthlyPremiumCharge[m]`
+  - `monthlyPremiumPaid[m]` (gross premium paid that month, 0 if not premium month or post-lapse)
+  - `monthlyLoyaltyBonus[m]` (bonus units credited)
+- runMonteCarlo aggregates monthly arrays → **yearly percentiles** P25/P50/P75 of each (for Phase 2d table)
+- Expose `getSumAssured(product, age)` from product registry — Phase 2d displays per-year SA
+- Track `monthlyAvgPremium` separately for break-even / TPP overlay (Phase 2e)
+
+**Tests to add:**
+- COI deterministic (closed-form for known age, sex, NAR)
+- Premium charge first-year vs subsequent-year ratio
+- Loyalty bonus credit at correct year + does not credit post-lapse
+- All 3 fee components sum correctly to `monthlyTotalFee`
+- Monthly arrays length = months; sum across months = scenario total
+
+### Phase 2d: Sale illustration table (3 tables — P25 / P50 / P75)
+**Goal:** Render Thai-insurance-standard sale illustration table comparable to insurer documents (e.g., AIA Life Issara). 3 tables stacked or tabbed: bad / medium / good case from Monte Carlo percentiles.
+
+**Why P25/P50/P75 instead of regulator's −1%/2%/5%:**
+- คปภ requires deterministic assumed-rate format (-1%, 2%, 5%) for sales documents
+- Our Monte Carlo gives stochastic percentiles using historical volatility + correlation + regime switching → richer + more realistic
+- 3-bucket display matches industry mental model (bad / mid / good) so agents recognise the format
+
+**Columns to render** (per row = year):
+| Col | Source |
+|---|---|
+| ปีที่ / อายุ | year index + userAge |
+| ความคุ้มครอง RPP | `getSumAssured(product, age)` |
+| ความคุ้มครองรวม | RPP + rider SA (riders = future) |
+| เบี้ย RPP | yearly aggregate of `monthlyPremiumPaid` |
+| เบี้ย RSP / Top Up | reserved cols (RSP = Phase 3+, default 0) |
+| รวมค่าธรรมเนียม | yearly sum of (admin + COI + premium charge) |
+| มูลค่ารับซื้อคืน (P25/P50/P75) | yearly percentile of portfolio value |
+| ความคุ้มครองชีวิต | SA + max(0, AUM - SA) for "เพิ่มจำนวนเงินเอาประกัน" mode |
+
+**UI considerations:**
+- 3 tables side-by-side (desktop) or tabbed (mobile)
+- Highlight rows where lapse occurs (per percentile if applicable)
+- Footer row = totals (เบี้ยรวม, ค่าธรรมเนียมรวม)
+- Export CSV (per table) for compare with insurer document
+- Toggle option (later in 2e): **deterministic mode** (-1%/2%/5%) for agents who prefer คปภ format
+
+**Scope:**
+- Pure UI rendering layer if Phase 2c data layer is complete
+- ~300-500 lines of HTML + JS table rendering
+- No new simulation logic
 
 ### Phase 2e: UI polish + What-if analysis
 - Gross/Net toggle
@@ -169,4 +218,7 @@ Each simulation month, in this exact order:
 - **Phase 6:** Save/load simulation runs
 
 ## Next action
-Phase 2a prompt — see `prompts/phase2a.md`
+- ✅ Phase 2a / 2a.5 / 2b — done
+- ⏭️ **Phase 2c prompt design** — focus on COI + premium charge + loyalty + monthly fee tracking (data layer for 2d)
+- 🆕 Phase 2d — sale illustration tables (P25/P50/P75)
+- 🚀 Phase 2e — UI polish + what-if + TPP overlay (existing parking lot)
