@@ -118,11 +118,6 @@
 
     </div>
 
-    <div class="action-row">
-      <button class="btn btn-primary" id="btnNext1" disabled>
-        ถัดไป: ตั้งค่า →
-      </button>
-    </div>
 
     <div style="margin-top:24px"></div>
 
@@ -305,6 +300,18 @@
 
     <!-- Covariance quality warning — shown when history is short or pairs are thin -->
     <div id="covWarningBanner" style="display:none"></div>
+
+    <!-- Calibration diagnostics — Bayesian shrinkage summary per fund -->
+    <div id="calibrationCard" class="card" style="display:none">
+      <div class="card-title" style="cursor:pointer;user-select:none" id="calibrationCardToggle">
+        <span class="icon">🎯</span> μ Calibration — ผลตอบแทนที่ใช้ในโมเดล
+        <span id="calibrationChevron" style="float:right;font-size:0.85em">▼ ดูรายละเอียด</span>
+      </div>
+      <div id="calibrationCardBody" style="display:none">
+        <div id="calibrationTable"></div>
+        <p id="calibrationNote" style="margin-top:0.75rem;font-size:0.85em;color:var(--gray-500)"></p>
+      </div>
+    </div>
 
     <!-- Outcome Summary Panel — injected by renderOutcomeSummary() -->
     <div id="resultSummaryPanel"></div>

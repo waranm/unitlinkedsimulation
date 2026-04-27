@@ -177,7 +177,6 @@ function applyNavData(navData) {
 
   renderSavedFundsList();
   const hasData = state.fundNames.length > 0;
-  document.getElementById('btnNext1').disabled = !hasData;
   if (hasData) showActiveDataPreview();
   else document.getElementById('dataPreview').style.display = 'none';
 }
@@ -421,13 +420,9 @@ function readAsText(file) {
 document.getElementById('btnClearAll').addEventListener('click', () => {
   if (!confirm('ลบข้อมูลกองทุนทั้งหมดออกจากหน่วยความจำ?')) return;
   clearAllStorage();
-  applyNavData({});
+  location.reload(true);
 });
 
-document.getElementById('btnNext1').addEventListener('click', () => {
-  buildParamsStep();
-  goToStep(1);
-});
 
 // ─── Step 2: Parameters ───────────────────────────────────────────────────────
 function buildParamsStep() {
@@ -1178,6 +1173,76 @@ function fmtIRR(irr) {
 
 // ─── Step 4: Results ──────────────────────────────────────────────────────────
 
+/**
+ * Render per-fund μ calibration card (Bayesian shrinkage diagnostics).
+ * Shows historical / prior / used annual return and α weight per fund.
+ * Rows with α < 0.7 (prior dominates) are highlighted in amber.
+ */
+function renderCalibrationCard() {
+  const card  = document.getElementById('calibrationCard');
+  const table = document.getElementById('calibrationTable');
+  const note  = document.getElementById('calibrationNote');
+  const toggle = document.getElementById('calibrationCardToggle');
+  const chevron = document.getElementById('calibrationChevron');
+  const body  = document.getElementById('calibrationCardBody');
+  if (!card || !table || !note) return;
+
+  const best = state.allResults[state.recommendedMode] || state.allResults['none'];
+  const diags = best && best.calibrationDiagnostics;
+  if (!diags || diags.length === 0) { card.style.display = 'none'; return; }
+
+  const assetLabel = { equity:'หุ้น', bond:'ตราสารหนี้', gold:'ทอง', mixed:'ผสม', reit:'อสังหาฯ', commodity:'สินค้าโภคภัณฑ์', money_market:'ตลาดเงิน' };
+  const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+
+  const rows = diags.map(d => {
+    const warn = d.shrinkAlpha < 0.7;
+    return `<tr style="${warn ? 'background:var(--warning-bg,#fff8e1)' : ''}">
+      <td style="font-weight:600">${d.fund}</td>
+      <td>${assetLabel[d.assetClass] || d.assetClass}</td>
+      <td style="color:var(--gray-500)">${fmt(d.historicalAnnual)}</td>
+      <td style="color:var(--gray-500)">${fmt(d.priorAnnual)}</td>
+      <td style="font-weight:600;color:var(--primary)">${fmt(d.shrunkAnnual)}</td>
+      <td style="${warn ? 'color:#e65100;font-weight:600' : ''}">${(d.shrinkAlpha * 100).toFixed(0)}%</td>
+    </tr>`;
+  }).join('');
+
+  table.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:0.88em">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="text-align:left;padding:4px 6px">กองทุน</th>
+          <th style="text-align:left;padding:4px 6px">ประเภท</th>
+          <th style="text-align:right;padding:4px 6px">Historical/ปี</th>
+          <th style="text-align:right;padding:4px 6px">Prior/ปี</th>
+          <th style="text-align:right;padding:4px 6px">ที่ใช้/ปี</th>
+          <th style="text-align:right;padding:4px 6px">น้ำหนักข้อมูล α</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  const noteLines = [
+    '"ที่ใช้" = blend ระหว่างข้อมูลในอดีต (α) กับ long-run prior (1−α) — ยิ่ง α สูงยิ่งพึ่งประวัติ',
+    'แถวสีเหลือง: α < 70% — ข้อมูลประวัติสั้น, prior มีอิทธิพลมาก',
+  ];
+  if (best.regimesNormalized) {
+    noteLines.push('✓ Regime switching ถูก normalize แล้ว: E[muScale]=1 ต่อกองทุน — ไม่กระทบ long-run mean');
+  }
+  note.innerHTML = noteLines.map(l => `<div>${l}</div>`).join('');
+
+  // Wire toggle once (use dataset flag to avoid double-binding)
+  if (toggle && !toggle.dataset.wired) {
+    toggle.dataset.wired = '1';
+    toggle.addEventListener('click', () => {
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : '';
+      if (chevron) chevron.textContent = open ? '▼ ดูรายละเอียด' : '▲ ซ่อน';
+    });
+  }
+
+  card.style.display = '';
+}
+
 function buildResultsStep() {
   document.querySelector('.pct-options').style.display         = '';
   document.getElementById('rebalCompareInsight').style.display = state.isSingleFund ? 'none' : '';
@@ -1195,6 +1260,7 @@ function buildResultsStep() {
     }
   }
 
+  renderCalibrationCard();
   renderOutcomeSummary();
 
   const chartTitleEl = document.getElementById('chartSectionTitle');
@@ -1484,7 +1550,7 @@ function buildSummaryTable() {
 
   // Row label: plain language instead of "percentile N"
   const rowLabels = {
-    98: 'กรณีดีมาก (P98)',
+    98: 'กรณีดีที่สุด (P98 — โอกาสน้อยมาก)',
     75: 'กรณีที่ดีกว่าปกติ (P75)',
     50: 'ผลลัพธ์โดยทั่วไป (P50)',
     25: 'กรณีที่ควรเตรียมรับมือ (P25)',

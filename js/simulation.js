@@ -72,6 +72,80 @@ function resampleMonthly(rows) {
   return Array.from(byMonth.values());
 }
 
+// ─── Long-run μ calibration (Bayesian shrinkage) ─────────────────────────────
+//
+// Problem: a short historical window (e.g. 3-year gold bull run → 22.9%/y)
+// fed directly into GBM over 69 years produces astronomical P50 values.
+// GBM has no mean-reversion; it blindly extrapolates the sample mean forever.
+//
+// Solution: shrink historical μ̂ toward a long-run prior using Bayesian
+// James–Stein-style shrinkage.  σ and correlations are NOT touched —
+// they carry genuine signal about volatility and co-movement.
+
+/**
+ * Long-run annualized expected returns (real-world prior μ∞).
+ * Override at runtime via window.LONG_RUN_MU_OVERRIDE = { equity: 0.08, ... }
+ */
+const LONG_RUN_MU_DEFAULTS = {
+  equity:       0.07,  // 7%/year  — long-run global equity
+  bond:         0.03,  // 3%/year  — investment grade
+  gold:         0.04,  // 4%/year  — long-run gold (nominal)
+  mixed:        0.05,  // 5%/year  — balanced / multi-asset
+  reit:         0.06,  // 6%/year  — real estate
+  commodity:    0.03,  // 3%/year
+  money_market: 0.02,  // 2%/year
+};
+
+/**
+ * Return long-run monthly log-return prior for an asset class.
+ * Applies window.LONG_RUN_MU_OVERRIDE if set (useful for what-if analysis).
+ * @param {string} assetClass
+ * @returns {number}  monthly log-return prior
+ */
+function getLongRunMu(assetClass) {
+  const overrides = (typeof window !== 'undefined' && window.LONG_RUN_MU_OVERRIDE) || {};
+  const merged = { ...LONG_RUN_MU_DEFAULTS, ...overrides };
+  const annualRate = merged[assetClass] ?? merged.mixed;
+  return Math.log(1 + annualRate) / 12;
+}
+
+/**
+ * Look up asset class for a fund — delegates to FundLib if available,
+ * falls back to 'mixed' in test environments where fundLibrary.js isn't loaded.
+ * @param {string} fund
+ * @returns {string}
+ */
+function getAssetClassForFund(fund) {
+  if (typeof window !== 'undefined' && window.FundLib?.getAssetClassForFund) {
+    return window.FundLib.getAssetClassForFund(fund);
+  }
+  return 'mixed'; // safe fallback for Node.js test environment
+}
+
+/**
+ * Bayesian shrinkage of the monthly log-return mean toward a long-run prior.
+ *
+ * Shrinkage weight α = n / (n + PRIOR_STRENGTH):
+ *   n=36  (3y data)  → α≈0.55  — prior dominates; historical data unreliable
+ *   n=120 (10y data) → α≈0.80  — mostly historical
+ *   n=240 (20y data) → α≈0.89  — data confident; prior barely matters
+ *
+ * @param {number} historicalMonthlyMu   raw mean of monthly log-returns
+ * @param {number} nObs                  number of monthly return observations
+ * @param {string} assetClass            one of LONG_RUN_MU_DEFAULTS keys
+ * @returns {{ mu: number, alpha: number, priorMonthly: number }}
+ *   mu           — shrunk monthly mean (use in GBM)
+ *   alpha        — data weight (0=pure prior, 1=pure historical)
+ *   priorMonthly — prior monthly log-return (for diagnostics)
+ */
+function shrinkMean(historicalMonthlyMu, nObs, assetClass) {
+  const PRIOR_STRENGTH = 120; // months of "virtual prior observations"
+  const priorMonthly = getLongRunMu(assetClass);
+  const alpha = nObs / (nObs + PRIOR_STRENGTH);
+  const mu = (1 - alpha) * priorMonthly + alpha * historicalMonthlyMu;
+  return { mu, alpha, priorMonthly };
+}
+
 /**
  * Calculate per-fund stats from historical data.
  * Input rows may be daily or monthly; stats are always returned as monthly.
@@ -113,13 +187,26 @@ function calcFundStats(navData) {
     }
 
     const n = returns.length;
-    const mean = n > 0 ? returns.reduce((a, b) => a + b, 0) / n : 0;
+    const rawMean = n > 0 ? returns.reduce((a, b) => a + b, 0) / n : 0;
     const variance = n > 1
-      ? returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)
+      ? returns.reduce((a, b) => a + (b - rawMean) ** 2, 0) / (n - 1)
       : 0;
 
+    // ── Bayesian shrinkage on μ (long-run anchoring) ─────────────────────
+    // Short historical windows (e.g. 3y gold bull run → 22.9%/y) would be
+    // extrapolated directly by GBM over multi-decade horizons.  Shrink
+    // toward a real-world long-run prior instead.  σ is left unchanged.
+    const assetClass = getAssetClassForFund(fund);
+    const { mu: mean, alpha: shrinkAlpha, priorMonthly: priorMonthlyMu } =
+      shrinkMean(rawMean, n, assetClass);
+
     stats[fund] = {
-      mean,
+      mean,           // shrunk μ — used by GBM
+      rawMean,        // historical sample mean — kept for diagnostics
+      shrinkAlpha,    // data weight α ∈ (0,1)
+      priorMonthlyMu, // prior monthly log-return
+      assetClass,
+      nObs: n,
       std:        Math.sqrt(variance) || 0.01,
       offerRatio: ratioCount > 0 ? sumOfferRatio / ratioCount : 1,
       bidRatio:   ratioCount > 0 ? sumBidRatio   / ratioCount : 1,
@@ -286,7 +373,7 @@ function calcIRR(premium, step, months, finalValue, pptMonths = null) {
   function fv(r) {
     let sum = 0;
     for (let m = 0; m < premiumLimit; m += step) {
-      sum += premium * Math.pow(1 + r, months - m);
+      sum += premium * Math.pow(1 + r, months - m - 1);
     }
     return sum;
   }
@@ -521,6 +608,73 @@ function buildPremiumMonths(mode, totalMonths, pptMonths = null) {
   return set;
 }
 
+// ─── Regime μ normalization ───────────────────────────────────────────────────
+
+/**
+ * Normalize regime muScales so E[muScale] = 1 under the stationary distribution,
+ * per fund.  This ensures regime switching changes the PATH and DISPERSION of
+ * returns but does NOT shift the long-run mean — μ stays anchored at the
+ * shrunk fundStats value.
+ *
+ * Funds using muOverride (absolute drift, e.g. gold in crisis) are skipped —
+ * their drift is intentional and should not be normalised.
+ *
+ * @param {Array}    regimes           regime config objects
+ * @param {number[][]} transitionMatrix row-stochastic Markov matrix
+ * @param {string[]} fundOrder
+ * @returns {Array}  new regimes array with normalised fundScales (caller's array untouched)
+ */
+function normalizeRegimeMuScales(regimes, transitionMatrix, fundOrder) {
+  if (!regimes.length || !transitionMatrix.length) return regimes;
+  const stationary = computeStationaryDist(transitionMatrix);
+
+  // Deep-clone so we never mutate the caller's config
+  const normalized = regimes.map(r => ({
+    ...r,
+    fundScales:   r.fundScales   ? { ...r.fundScales }   : undefined,
+    defaultScale: r.defaultScale ? { ...r.defaultScale } : undefined,
+  }));
+
+  for (const fund of fundOrder) {
+    let weightedSum = 0;
+    let hasOverride = false;
+    const scales = [];
+
+    for (let i = 0; i < normalized.length; i++) {
+      const r = normalized[i];
+      const s = r.fundScales?.[fund] ?? r.defaultScale ?? r;
+      if ('muOverride' in s) { hasOverride = true; break; }
+      const sc = s.muScale ?? 1;
+      scales.push(sc);
+      weightedSum += stationary[i] * sc;
+    }
+
+    // Skip funds with absolute muOverride — those are intentional
+    if (hasOverride || weightedSum <= 1e-9) continue;
+
+    // Rescale each regime's effective muScale for this fund
+    for (let i = 0; i < normalized.length; i++) {
+      const r = normalized[i];
+      const perFund = r.fundScales?.[fund];
+
+      if (perFund && 'muScale' in perFund) {
+        // Explicit per-fund scale exists — normalise in place
+        perFund.muScale = perFund.muScale / weightedSum;
+      } else if (!perFund && r.defaultScale && !('muOverride' in r.defaultScale)) {
+        // No per-fund override; create one derived from defaultScale
+        if (!r.fundScales) r.fundScales = {};
+        r.fundScales[fund] = {
+          muScale:    (r.defaultScale.muScale ?? 1) / weightedSum,
+          sigmaScale: r.defaultScale.sigmaScale ?? 1,
+        };
+      }
+      // If neither fundScales nor defaultScale applies, muScale is implicitly 1 for
+      // every regime → weightedSum = 1 → nothing to normalise; loop is a no-op.
+    }
+  }
+  return normalized;
+}
+
 // ─── Main simulation runner ───────────────────────────────────────────────────
 
 /**
@@ -571,6 +725,14 @@ async function runMonteCarlo(config, onProgress) {
   const { fundStats, fundOrder, choleskyL, covDiagnostics } = calcSimParams(navData);
   const funds = fundOrder;
 
+  // ── Regime μ normalization (default ON) ─────────────────────────────────
+  // Forces E[muScale] = 1 under stationary dist per fund so regime switching
+  // changes path dispersion but does NOT shift the long-run shrunk mean.
+  const normalizeRegimes = config.normalizeRegimes !== false;
+  const effectiveRegimes = (regimeSwitching && normalizeRegimes)
+    ? normalizeRegimeMuScales(regimes, transitionMatrix, fundOrder)
+    : regimes;
+
   // Normalise allocation to fractions
   const allocFrac = {};
   const totalPct = funds.reduce((s, f) => s + (allocation[f] || 0), 0);
@@ -598,7 +760,7 @@ async function runMonteCarlo(config, onProgress) {
       allocation: allocFrac, months,
       premium, premiumMonths,
       rebalanceMode, initialNav, feeParams, rng,
-      regimeSwitching, regimes, transitionMatrix, stationaryDist
+      regimeSwitching, regimes: effectiveRegimes, transitionMatrix, stationaryDist
     });
     allSeries.push(values);
     lapseMonths.push(lapseMonth);
@@ -693,9 +855,25 @@ async function runMonteCarlo(config, onProgress) {
     p50AdminFee = adminFees[p50Pick.idx];
   }
 
+  // ── Calibration diagnostics (per-fund shrinkage summary) ────────────────
+  const calibrationDiagnostics = fundOrder.map(f => {
+    const s = fundStats[f];
+    return {
+      fund:              f,
+      assetClass:        s.assetClass  ?? 'mixed',
+      nObs:              s.nObs        ?? null,
+      historicalAnnual:  (Math.exp((s.rawMean   ?? s.mean) * 12) - 1) * 100,
+      priorAnnual:       (Math.exp(s.priorMonthlyMu * 12) - 1) * 100,
+      shrunkAnnual:      (Math.exp(s.mean * 12) - 1) * 100,
+      shrinkAlpha:       s.shrinkAlpha ?? 1,
+    };
+  });
+
   return {
     percentiles, months, meanSeries, covDiagnostics,
     survivalMonthly, survivalYearly, avgLapseAge, userAge,
     p50AdminFee,
+    calibrationDiagnostics,
+    regimesNormalized: regimeSwitching && normalizeRegimes,
   };
 }

@@ -295,24 +295,25 @@ console.log('\nSuite 4: Cholesky L × Lᵀ = Cov');
 // ═══════════════════════════════════════════════════════════════════════════════
 console.log('\nSuite 5: calcIRR');
 {
-  // ── 5a. 1-period exact case ───────────────────────────────────────────────
-  // FV(r) = premium × (1+r)^1  →  r = finalValue/premium − 1
+  // ── 5a. Single-payment, 1 growth period ──────────────────────────────────
+  // step=2 ≥ months=2 → only m=0 fires; exponent = months-m-1 = 1
+  // FV = premium × (1+r)^1  →  r = finalValue/premium − 1
   // final=5500, premium=5000  →  r=0.1/mo, annual=(1.1)^12−1
-  const irr5a = calcIRR(5000, 1, 1, 5500);
-  near('1-period: r=10%/mo → ann IRR', irr5a, (Math.pow(1.1, 12) - 1) * 100, 1e-6);
+  const irr5a = calcIRR(5000, 2, 2, 5500);
+  near('1-period growth: r=10%/mo → ann IRR', irr5a, (Math.pow(1.1, 12) - 1) * 100, 1e-6);
 
-  // ── 5b. 1-period zero return ──────────────────────────────────────────────
-  // final = premium  →  r=0  →  annual IRR = 0%
-  const irr5b = calcIRR(5000, 1, 1, 5000);
-  near('1-period: zero return → 0%', irr5b, 0, 1e-6);
+  // ── 5b. Single-payment zero return ───────────────────────────────────────
+  // FV = premium × (1+0)^1 = premium → r=0 → annual IRR = 0%
+  const irr5b = calcIRR(5000, 2, 2, 5000);
+  near('1-period growth: zero return → 0%', irr5b, 0, 1e-6);
 
   // ── 5c. 12-period at exactly r=1%/month (self-consistent with FV formula) ─
-  // Construct FV using the same compounding convention as calcIRR,
-  // then recover r — must round-trip exactly.
+  // Construct FV using the corrected exponent (months − m − 1) so round-trip
+  // is exact: premium at m=0 experiences 11 shocks before the final snapshot.
   const r_mo = 0.01;
   const T    = 12;
   let fvExact = 0;
-  for (let k = 0; k < T; k++) fvExact += 5000 * Math.pow(1 + r_mo, T - k);
+  for (let k = 0; k < T; k++) fvExact += 5000 * Math.pow(1 + r_mo, T - k - 1);
   const irr5c = calcIRR(5000, 1, T, fvExact);
   near('12-period: round-trip r=1%/mo', irr5c, (Math.pow(1 + r_mo, 12) - 1) * 100, 1e-6);
 
@@ -323,13 +324,12 @@ console.log('\nSuite 5: calcIRR');
     `got IRR = ${irr5d?.toFixed(4)}`);
 
   // ── 5e. Quarterly payment mode ────────────────────────────────────────────
-  // calcIRR works in months throughout (exponent = months − payment_month).
-  // Build FV using an explicit monthly rate so the round-trip is self-consistent.
-  //   4 payments at months 0, 3, 6, 9  →  exponents 12, 9, 6, 3
+  // calcIRR works in months throughout; exponent = months − payment_month − 1.
+  //   4 payments at months 0, 3, 6, 9  →  exponents 11, 8, 5, 2
   const r_mo_q = 0.005;   // 0.5 % per month  (explicit, not per-quarter)
   const step_q = 3, T_q = 12;
   let fvQ = 0;
-  for (let k = 0; k < T_q; k += step_q) fvQ += 5000 * Math.pow(1 + r_mo_q, T_q - k);
+  for (let k = 0; k < T_q; k += step_q) fvQ += 5000 * Math.pow(1 + r_mo_q, T_q - k - 1);
   const ann_q = (Math.pow(1 + r_mo_q, 12) - 1) * 100;   // ≈ 6.168 %
   const irr5e = calcIRR(5000, step_q, T_q, fvQ);
   near('quarterly: round-trip r=0.5%/mo', irr5e, ann_q, 1e-6);
