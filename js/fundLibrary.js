@@ -23,7 +23,7 @@ const ASSET_CLASS_MAP = {
   // ── Money market ──────────────────────────────────────────────────────────
   'ABCC':               'money_market', // แคช ครีเอชั่น
   'ES-CASH':            'money_market', // บริหารเงิน
-  'UIDPLUS':            'money_market', // อินคัม เดลี่ อัลตร้า พลัส ⚠️ verify
+  'UIDPLUS':            'bond', // อินคัม เดลี่ อัลตร้า พลัส ⚠️ verify
 
   // ── REIT / Property ───────────────────────────────────────────────────────
   'ES-PIPF':            'reit',   // Property and Infrastructure Income Plus Flexible
@@ -54,7 +54,7 @@ const ASSET_CLASS_MAP = {
   'UOBSJSM':            'equity', // เจแปนสมอลแอนด์มิดแคป
   'USUS':               'equity', // ซัสเทนเนเบิล อิควิตี้
   'UCHINA':             'equity', // ออล ไชน่า อิควิตี้
-  'UEMIF-N':            'equity', // อีเมอร์จิ้ง มาร์เก็ต อินคัม ⚠️ verify (could be bond)
+  'UEMIF-N':            'mixed', // อีเมอร์จิ้ง มาร์เก็ต อินคัม ⚠️ verify (could be bond)
   'UGD':                'equity', // โกลบอล ดูเรเบิ้ล อิควิตี้
   'UNI':                'equity', // โกลบอล อินโนเวชั่น
   'ABSM':               'equity', // สมอล-มิดแค็พ
